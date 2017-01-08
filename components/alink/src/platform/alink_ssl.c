@@ -2,6 +2,8 @@
 #include "openssl/ssl.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_log.h"
 
 #include "lwip/err.h"
 #include "lwip/sockets.h"
@@ -9,64 +11,73 @@
 #include "lwip/api.h"
 #include "lwip/netdb.h"
 
-#include "adapter_layer_config.h"
 #include "platform/platform.h"
 
 static SSL_CTX *ctx = NULL;
+static const char *TAG = "alink ssl";
+#define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
+#define require_action_NULL(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); return NULL;}
 
 void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_ int server_cert_len)
 {
-    printf("=== [%s, %d] ===\n", __func__, __LINE__);
-    printf("tcp_fd: %p, server_cert: %p, server_cert_len: %d\n",
-           tcp_fd , server_cert, server_cert_len);
+    require_action_exit(tcp_fd == NULL, "[%s, %d]:Parameter error tcp_fd == NULL", __func__, __LINE__);
+    require_action_exit(server_cert == NULL, "[%s, %d]:Parameter error server_cert == NULL", __func__, __LINE__);
+
     SSL *ssl;
     int socket = (int)tcp_fd;
-    printf("socket: %d\n", socket);
     int ret = -1;
-    ALINK_ADAPTER_CONFIG_ASSERT(tcp_fd != NULL);
+    printf("tcp_fd: %d, server_cert: %p, server_cert_len: %d\n",
+           socket , server_cert, server_cert_len);
+
     ctx = SSL_CTX_new(TLSv1_1_client_method());
     ssl = SSL_new(ctx);
     SSL_set_fd(ssl, socket);
     X509 *ca_cert = d2i_X509(NULL, (unsigned char *)server_cert, server_cert_len);
-    ALINK_ADAPTER_CONFIG_ASSERT(ca_cert != NULL);
+    require_action_NULL(ca_cert == NULL, "[%s, %d]:d2i_X509", __func__, __LINE__);
+
     ret = SSL_add_client_CA(ssl, ca_cert);
-    ALINK_ADAPTER_CONFIG_ASSERT(ret != 0);
+    require_action_NULL(ret == -1, "[%s, %d]:SSL_add_client_CA", __func__, __LINE__);
+
     ret = SSL_connect(ssl);
-    ALINK_ADAPTER_CONFIG_ASSERT(ret != -1);;
+    require_action_NULL(ret == -1, "[%s, %d]:SSL_add_client_CA", __func__, __LINE__);
+
     return (void *)(ssl);
 }
 
 int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
 {
+    require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+
     int cnt = 0;
-    ALINK_ADAPTER_CONFIG_ASSERT(ssl != NULL);
-    ALINK_ADAPTER_CONFIG_ASSERT(buffer != NULL);
     cnt = SSL_write((SSL*)ssl, buffer, length);
     return (cnt > 0) ? cnt : -1;
 }
 
 int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
 {
-    printf("=== [%s, %d] ===\n", __func__, __LINE__);
+    require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
     int cnt = 0;
-    ALINK_ADAPTER_CONFIG_ASSERT(ssl != NULL);
-    ALINK_ADAPTER_CONFIG_ASSERT(buffer != NULL);
     cnt = SSL_read((SSL*)ssl, buffer, length);
     return cnt > 0 ? cnt : -1;
 }
 
 int platform_ssl_close(_IN_ void *ssl)
 {
+    require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
     int ret = -1;
-    // ALINK_ADAPTER_CONFIG_ASSERT(ssl != NULL);
     ret = SSL_shutdown((SSL *)ssl);
     if (ret != 0) {
+        ESP_LOGE(TAG, "[%s, %d]:SSL_shutdown", __func__, __LINE__);
         return -1;
     }
 
     int fd = SSL_get_fd((SSL *)ssl);
-    printf("=== [%s, %d] === ssl: %p ret: %d fd: %d\n", __func__, __LINE__, ssl, ret, fd);
-    // ALINK_ADAPTER_CONFIG_ASSERT(fd <= 0);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "[%s, %d]:SSL_get_fd", __func__, __LINE__);
+        return -1;
+    }
     close(fd);
 
     if (ssl) {

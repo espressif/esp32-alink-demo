@@ -227,7 +227,7 @@ void alink_fill_deviceinfo(struct device_info *deviceinfo)
 	printf("DEV_MODEL:%s \n", deviceinfo->model);
 }
 
-// extern PRIVILEGED_DATA TCB_t * volatile pxCurrentTCB[ portNUM_PROCESSORS ] = { NULL };
+// extern  TCB_t * pxCurrentTCB[ portNUM_PROCESSORS ];
 
 void alink_demo()
 {

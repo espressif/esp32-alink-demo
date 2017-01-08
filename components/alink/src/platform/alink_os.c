@@ -4,6 +4,7 @@
 #include "freertos/semphr.h"
 #include "freertos/timers.h"
 #include "freertos/portmacro.h"
+#include "esp_log.h"
 
 #include "string.h"
 #include "esp_system.h"
@@ -12,12 +13,15 @@
 #include "nvs_flash.h"
 
 #include "platform.h"
-#include "adapter_layer_config.h"
-
-
 #define ALINK_CHIPID "rtl8188eu 12345678"
 #define ESP_SYSTEM_VERSION "esp32_idf_v1.0.0"
+#define ESP_DEFAULU_TASK_PRIOTY (tskIDLE_PRIORITY + 4)
+
 #define PLATFORM_TABLE_CONTENT_CNT(table) (sizeof(table)/sizeof(table[0]))
+
+static const char *TAG = "alink_os";
+#define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
+#define require_action_NULL(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); return NULL;}
 
 typedef struct task_name_handler_content {
     const char* task_name;
@@ -39,6 +43,8 @@ task_infor_t task_infor[] = {
     {"alcs_thread", NULL},
     {"alink_main_thread", NULL},
     {"send_worker", NULL},
+    {"callback_thread", NULL},
+    {"firmware_upgrade_pthread", NULL},
 };
 
 void platform_printf(const char *fmt, ...)
@@ -57,22 +63,16 @@ void platform_printf(const char *fmt, ...)
 void *platform_malloc(_IN_ uint32_t size)
 {
     void * c = malloc(size);
-    if (c == NULL) {
-        ESP_LOG(ESP_ERROR_LEVEL, "malloc size : %d", size);
-        return NULL;
-    }
+    require_action_NULL(c == NULL, "[%s, %d]:malloc size : %d", __func__, __LINE__, size);
     return c;
 }
 
 void platform_free(_IN_ void *ptr)
 {
-    // ALINK_ADAPTER_CONFIG_ASSERT(ptr != NULL);
     if (ptr == NULL) return;
     free(ptr);
     ptr = NULL;
-
 }
-
 
 /************************ mutex manage ************************/
 
@@ -80,42 +80,26 @@ void *platform_mutex_init(void)
 {
     xSemaphoreHandle mux_sem = NULL;
     mux_sem = xSemaphoreCreateMutex();
-    if (mux_sem != NULL) {
-        // printf("create mux: %p\n", mux_sem);
-        return mux_sem;
-    }
-    ESP_LOG(ESP_ERROR_LEVEL, "Creat Mux");
-    return NULL;
+    require_action_NULL(mux_sem == NULL, "[%s, %d]:xSemaphoreCreateMutex", __func__, __LINE__);
+    return mux_sem;
 }
 
 void platform_mutex_destroy(_IN_ void *mutex)
 {
-    if (mutex != NULL) {
-        vSemaphoreDelete(mutex);
-        return;
-    }
-    ESP_LOG(ESP_ERROR_LEVEL, "delet Mux");
-    return ;
+    require_action_exit(mutex == NULL, "[%s, %d]:Parameter error mutex == NULL", __func__, __LINE__);
+    vSemaphoreDelete(mutex);
 }
 
 void platform_mutex_lock(_IN_ void *mutex)
 {
     //if can not get the mux,it will wait all the time
-    printf("mutex: %p\n", mutex);
-    if (mutex == NULL) {
-        ESP_LOG(ESP_ERROR_LEVEL, "mutex lock");
-        return;
-    }
+    require_action_exit(mutex == NULL, "[%s, %d]:Parameter error mutex == NULL", __func__, __LINE__);
     xSemaphoreTake(mutex, portMAX_DELAY);
 }
 
 void platform_mutex_unlock(_IN_ void *mutex)
 {
-    printf("mutex unlock: %p\n", mutex);
-    if (mutex == NULL) {
-        ESP_LOG(ESP_ERROR_LEVEL, "mutex unlock");
-        return;
-    }
+    require_action_exit(mutex == NULL, "[%s, %d]:Parameter error mutex == NULL", __func__, __LINE__);
     xSemaphoreGive(mutex);
 }
 
@@ -125,22 +109,19 @@ void *platform_semaphore_init(void)
 {
     xSemaphoreHandle count_handler = NULL;
     count_handler = xSemaphoreCreateCounting(255, 0);
-    if (count_handler != NULL) {
-        return count_handler;
-    }
-    ESP_LOG(ESP_ERROR_LEVEL, "Creat Semphore");
-    return NULL;
+    require_action_NULL(count_handler == NULL, "[%s, %d]:xSemaphoreCreateCounting", __func__, __LINE__);
+    return count_handler;
 }
 
 void platform_semaphore_destroy(_IN_ void *sem)
 {
-    ALINK_ADAPTER_CONFIG_ASSERT(sem != NULL);
+    require_action_exit(sem == NULL, "[%s, %d]:Parameter error sem == NULL", __func__, __LINE__);
     vSemaphoreDelete(sem);
 }
 
 int platform_semaphore_wait(_IN_ void *sem, _IN_ uint32_t timeout_ms)
 {
-    ALINK_ADAPTER_CONFIG_ASSERT(sem != NULL);
+    require_action_exit(sem == NULL, "[%s, %d]:Parameter error sem == NULL", __func__, __LINE__);
     //Take the Semaphore
     if (pdTRUE == xSemaphoreTake(sem, timeout_ms / portTICK_RATE_MS)) {
         return 0;
@@ -152,19 +133,13 @@ int platform_semaphore_wait(_IN_ void *sem, _IN_ uint32_t timeout_ms)
 
 void platform_semaphore_post(_IN_ void *sem)
 {
-    ALINK_ADAPTER_CONFIG_ASSERT(sem != NULL);
-    if (sem != NULL) {
-        xSemaphoreGive(sem);
-        return;
-    }
-    ESP_LOG(ESP_ERROR_LEVEL, "post sem");
-    return;
+    require_action_exit(sem == NULL, "[%s, %d]:Parameter error sem == NULL", __func__, __LINE__);
+    xSemaphoreGive(sem);
 }
 
 void platform_msleep(_IN_ uint32_t ms)
 {
-    ALINK_ADAPTER_CONFIG_ASSERT(portTICK_PERIOD_MS != 0);
-    vTaskDelay(ms / portTICK_PERIOD_MS);
+    vTaskDelay(ms / portTICK_RATE_MS);
 }
 
 uint32_t platform_get_time_ms(void)
@@ -174,34 +149,24 @@ uint32_t platform_get_time_ms(void)
 
 int platform_thread_get_stack_size(_IN_ const char *thread_name)
 {
-    if (0 == strcmp(thread_name, "alink_main_thread"))
-    {
-        printf("get alink_main_thread\n");
+    require_action_exit(thread_name == NULL, "[%s, %d]:Parameter error thread_name == NULL", __func__, __LINE__);
+    if (0 == strcmp(thread_name, "alink_main_thread")) {
+        ESP_LOGI(TAG, "get alink_main_thread");
         return 0xc00;
-    }
-    else if (0 == strcmp(thread_name, "wsf_worker_thread"))
-    {
-        printf("get wsf_worker_thread\n");
+    } else if (0 == strcmp(thread_name, "wsf_worker_thread")) {
+        ESP_LOGI(TAG, "get wsf_worker_thread");
         return 0x2100;
-    }
-    else if (0 == strcmp(thread_name, "firmware_upgrade_pthread"))
-    {
-        printf("get firmware_upgrade_pthread\n");
+    } else if (0 == strcmp(thread_name, "firmware_upgrade_pthread")) {
+        ESP_LOGI(TAG, "get firmware_upgrade_pthread");
         return 0xc00;
-    }
-    else if (0 == strcmp(thread_name, "send_worker"))
-    {
-        printf("get send_worker\n");
+    } else if (0 == strcmp(thread_name, "send_worker")) {
+        ESP_LOGI(TAG, "get send_worker");
         return 0x800;
-    }
-    else if (0 == strcmp(thread_name, "callback_thread"))
-    {
-        printf("get callback_thread\n");
+    } else if (0 == strcmp(thread_name, "callback_thread")) {
+        ESP_LOGI(TAG, "get callback_thread");
         return 0x800;
-    }
-    else
-    {
-        printf("get othrer thread\n");
+    } else {
+        ESP_LOGI(TAG, "get othrer thread");
         return 0x800;
     }
 
@@ -214,7 +179,7 @@ int platform_thread_get_stack_size(_IN_ const char *thread_name)
     return -1: not found the name from the list
           !-1: found the pos in the list
 */
-static int platform_get_task_name_location(char * name)
+static int get_task_name_location(const char * name)
 {
     uint32_t i = 0;
     uint32_t len = 0;
@@ -227,40 +192,40 @@ static int platform_get_task_name_location(char * name)
     return -1;
 }
 
-static void  platform_get_task_handler(uint32_t pos, void** handler)
-{
-    ALINK_ADAPTER_CONFIG_ASSERT(pos != -1);
-    ALINK_ADAPTER_CONFIG_ASSERT(pos <= PLATFORM_TABLE_CONTENT_CNT(task_infor) - 1);
-    *handler = (void*)task_infor[pos].handler;
-}
+// static void  platform_get_task_handler(uint32_t pos, void** handler)
+// {
+//     ALINK_ADAPTER_CONFIG_ASSERT(pos != -1);
+//     ALINK_ADAPTER_CONFIG_ASSERT(pos <= PLATFORM_TABLE_CONTENT_CNT(task_infor) - 1);
+//     *handler = (void*)task_infor[pos].handler;
+// }
 
-static bool platform_save_task_name_handler(uint32_t pos, void * handler)
+static bool set_task_name_handler(uint32_t pos, void * handler)
 {
-    ALINK_ADAPTER_CONFIG_ASSERT(pos <= PLATFORM_TABLE_CONTENT_CNT(task_infor) - 1);
     task_infor[pos].handler = handler;
     return true;
 }
 
 int platform_thread_create(_OUT_ void **thread,
                            _IN_ const char *name,
-                           _IN_ void *(*start_routine) (void *),
+                           _IN_ void *(*start_routine)(void *),
                            _IN_ void *arg,
                            _IN_ void *stack,
                            _IN_ uint32_t stack_size,
                            _OUT_ int *stack_used)
 {
-    ALINK_ADAPTER_CONFIG_ASSERT(stack != NULL);
-    ALINK_ADAPTER_CONFIG_ASSERT(stack_size != 0);
+    require_action_exit(name == NULL, "[%s, %d]:Parameter error name == NULL", __func__, __LINE__);
+    require_action_exit(stack_size == 0, "[%s, %d]:Parameter error stack_size == 0", __func__, __LINE__);
     printf("task name: %s, stack_size: %d=\n", name, stack_size);
 
-    if (pdTRUE == xTaskCreate(start_routine, name, stack_size, arg, ESP_DEFAULU_TASK_PRIOTY, thread)) {
-        int pos = platform_get_task_name_location(name);
+    if (pdTRUE == xTaskCreatePinnedToCore(start_routine, name, stack_size*2, arg, ESP_DEFAULU_TASK_PRIOTY, thread, 0)) {
+        int pos = get_task_name_location(name);
         if  (-1 != pos) {
-            platform_save_task_name_handler(pos, *thread);
+            set_task_name_handler(pos, *thread);
         }
         return 0;
     }
-    ESP_LOG(ESP_ERROR_LEVEL, "CreatTask");
+    ESP_LOGE(TAG, "[%s, %d]:xTaskCreate", __func__, __LINE__);
+
     return -1;
 }
 
@@ -274,8 +239,8 @@ void platform_thread_exit(_IN_ void *thread)
 /************************ config ************************/
 int platform_config_read(_OUT_ char *buffer, _IN_ int length)
 {
-    if (!buffer || length <= 0)
-        return -1;
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+
     // printf("---------- platform_config_read: %02x %02x %02x length: %d -------------\n",
     //        buffer[0], buffer[1], buffer[2], length);
     esp_err_t ret     = -1;
@@ -291,6 +256,7 @@ int platform_config_read(_OUT_ char *buffer, _IN_ int length)
 
 int platform_config_write(_IN_ const char *buffer, _IN_ int length)
 {
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
     // printf("---------- platform_config_write: %02x %02x %02x length: %d -------------\n",
     //        buffer[0], buffer[1], buffer[2], length);
 
@@ -334,7 +300,7 @@ int platform_sys_net_is_ready(void)
 void platform_sys_reboot(void)
 {
     ets_printf("=== [%s, %d] ===\n", __func__, __LINE__);
-    system_restart();
+    esp_restart();
 }
 
 

@@ -1,41 +1,33 @@
 #include <esp_types.h>
 #include "string.h"
+#include "esp_log.h"
 
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 #include "lwip/ip_addr.h"
 #include "lwip/api.h"
 #include "lwip/netdb.h"
+#include "esp_system.h"
 
-#include "adapter_layer_config.h"
 #include "platform/platform.h"
 #include "tcpip_adapter.h"
 
 #define SOMAXCONN 5
 
-#define SOCKET_ERROR (-1)
-#define SOCKET_CHECK_ERROR(func) \
-    do{\
-        if(func==SOCKET_ERROR){\
-            ESP_LOG(ESP_ERROR_LEVEL,"SOCKET");\
-        }\
-    }while(0)
+static const char *TAG = "alink_network";
+#define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
+#define require_action_NULL(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); return NULL;}
 
-
-#define BUFFER_CHECK_ERROR(buffer) \
-    do{\
-        if(NULL==buffer){\
-            ESP_LOG(ESP_ERROR_LEVEL,"BUFFER");}\
-    } while (0)
-
-static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct sockaddr_in *paddr, long *psock)
+static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct sockaddr_in *paddr, int *psock)
 {
+    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
+    require_action_exit(paddr == NULL, "[%s, %d]:Parameter error paddr == NULL", __func__, __LINE__);
+    require_action_exit(psock == NULL, "[%s, %d]:Parameter error psock == NULL", __func__, __LINE__);
+
     struct hostent *hp;
     uint32_t ip;
-    int opt_val = 1;
-    printf("free heap_size: %d\n", uxTaskGetStackHighWaterMark(NULL));
-    if ((NULL == paddr) || (NULL == psock))
-        return -1;
+
+    // printf("free heap_size: %d\n", uxTaskGetStackHighWaterMark(NULL));
 
     if (NULL == netaddr->host) {
         ip = htonl(INADDR_ANY);
@@ -49,7 +41,7 @@ static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct 
         printf("netaddr->host:%s\n", netaddr->host);
         hp = gethostbyname(netaddr->host);
         if (!hp) {
-            printf("can't resolute the host address \n");
+            ESP_LOGE(TAG, "can't resolute the host address");
             return -1;
         }
         struct ip4_addr *ip4_addr = (struct ip4_addr *)hp->h_addr;
@@ -64,8 +56,8 @@ static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct 
 
     memset(paddr, 0, sizeof(struct sockaddr_in));
 
-    // if (0 != setsockopt(*psock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val)))
-    // {
+    // int opt_val = 1;
+    // if (0 != setsockopt(*psock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val))){
     //     close((int)*psock);
     //     return -1;
     // }
@@ -80,17 +72,17 @@ static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct 
 void *platform_udp_server_create(_IN_ uint16_t port)
 {
     struct sockaddr_in addr;
-    long server_socket;
+    int server_socket;
     platform_netaddr_t netaddr = {NULL, port};
 
-    if (0 != network_create_socket(&netaddr, SOCK_DGRAM, &addr, &server_socket))
-    {
+    if (0 != network_create_socket(&netaddr, SOCK_DGRAM, &addr, &server_socket)) {
+        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
         return NULL;
     }
 
-    if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in)))
-    {
+    if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in))) {
         platform_udp_close((void *)server_socket);
+        ESP_LOGE(TAG, "[%s, %d]:socket bind", __func__, __LINE__);
         return NULL;
     }
 
@@ -101,11 +93,11 @@ void *platform_udp_client_create(void)
 {
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
-    long sock;
+    int sock;
     platform_netaddr_t netaddr = {NULL, 0};
 
-    if (0 != network_create_socket(&netaddr, SOCK_DGRAM, &addr, &sock))
-    {
+    if (0 != network_create_socket(&netaddr, SOCK_DGRAM, &addr, &sock)) {
+        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
         return NULL;
     }
 
@@ -114,10 +106,11 @@ void *platform_udp_client_create(void)
 
 void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
 {
+    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int option = 1;
     struct sockaddr_in addr;
-    long sock;
+    int sock;
     struct ip_mreq mreq;
 
     platform_netaddr_t netaddr_client = {NULL, netaddr->port};
@@ -125,33 +118,28 @@ void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
     memset(&addr, 0, sizeof(addr));
     memset(&mreq, 0, sizeof(mreq));
 
-    if (0 != network_create_socket(&netaddr_client, SOCK_DGRAM, &addr, &sock))
-    {
+    if (0 != network_create_socket(&netaddr_client, SOCK_DGRAM, &addr, &sock)) {
+        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
         return NULL;
     }
 
     /* allow multiple sockets to use the same PORT number */
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&option, sizeof(option)) < 0)
-    {
-        printf("Reusing ADDR failed\n");
-
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&option, sizeof(option)) < 0) {
+        ESP_LOGE(TAG, "[%s, %d]:setsockopt Reusing ADDR", __func__, __LINE__);
         platform_udp_close((void *)sock);
-        //do something.
         return NULL;
     }
 
-    if (-1 == bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)))
-    {
-        printf("bind error...\n");
+    if (-1 == bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
+        ESP_LOGE(TAG, "[%s, %d]:socket bind", __func__, __LINE__);
         platform_udp_close((void *)sock);
         return NULL;
     }
 
     mreq.imr_multiaddr.s_addr = inet_addr(netaddr->host);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &mreq, sizeof(mreq)) < 0)
-    {
-        printf("setsockopt error \n");
+    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &mreq, sizeof(mreq)) < 0) {
+        ESP_LOGE(TAG, "[%s, %d]:setsockopt IP_ADD_MEMBERSHIP", __func__, __LINE__);
         platform_udp_close((void *)sock);
         return NULL;
     }
@@ -161,7 +149,7 @@ void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
 
 void platform_udp_close(void *handle)
 {
-    close((long)handle);
+    close((int)handle);
 }
 
 
@@ -171,22 +159,25 @@ int platform_udp_sendto(
     _IN_ uint32_t length,
     _IN_ pplatform_netaddr_t netaddr)
 {
+    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
     int ret_code;
     struct hostent *hp;
     struct sockaddr_in addr;
 
-    if (NULL == (hp = gethostbyname(netaddr->host)))
-    {
+    if (NULL == (hp = gethostbyname(netaddr->host))) {
+        ESP_LOGE(TAG, "[%s, %d]:gethostbyname", __func__, __LINE__);
         printf("Can't resolute the host address \n");
         return -1;
     }
 
-    addr.sin_addr.s_addr = *((u_long *)(hp->h_addr));
-    //addr.sin_addr.S_un.S_addr = *((u_long *)(hp->h_addr));
+    addr.sin_addr.s_addr = *((u_int *)(hp->h_addr));
+    //addr.sin_addr.S_un.S_addr = *((u_int *)(hp->h_addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons( netaddr->port );
 
-    ret_code = sendto((long)handle,
+    ret_code = sendto((int)handle,
                       buffer,
                       length,
                       0,
@@ -203,25 +194,25 @@ int platform_udp_recvfrom(
     _IN_ uint32_t length,
     _OUT_OPT_ pplatform_netaddr_t netaddr)
 {
+    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+    // require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int ret_code;
     struct sockaddr_in addr;
     unsigned int addr_len = sizeof(addr);
 
-    ret_code = recvfrom((long)handle, buffer, length, 0, (struct sockaddr *)&addr, &addr_len);
-    if (ret_code > 0)
-    {
-        if (NULL != netaddr)
-        {
+    ret_code = recvfrom((int)handle, buffer, length, 0, (struct sockaddr *)&addr, &addr_len);
+    if (ret_code > 0) {
+        if (NULL != netaddr) {
             netaddr->port = ntohs(addr.sin_port);
-
-            if (NULL != netaddr->host)
-            {
+            if (NULL != netaddr->host) {
                 strcpy(netaddr->host, inet_ntoa(addr.sin_addr));
             }
         }
         return ret_code;
     }
+
     return -1;
 }
 
@@ -231,22 +222,22 @@ void *platform_tcp_server_create(_IN_ uint16_t port)
 {
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
-    long server_socket;
+    int server_socket;
     platform_netaddr_t netaddr = {NULL, port};
 
-    if (0 != network_create_socket(&netaddr, SOCK_STREAM, &addr, &server_socket))
-    {
+    if (0 != network_create_socket(&netaddr, SOCK_STREAM, &addr, &server_socket)) {
+        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
         return NULL;
     }
 
-    if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(addr)))
-    {
+    if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(addr))) {
+        ESP_LOGE(TAG, "[%s, %d]:bind", __func__, __LINE__);
         platform_tcp_close((void *)server_socket);
         return NULL;
     }
 
-    if (0 != listen(server_socket, SOMAXCONN))
-    {
+    if (0 != listen(server_socket, SOMAXCONN)) {
+        ESP_LOGE(TAG, "[%s, %d]:listen", __func__, __LINE__);
         platform_tcp_close((void *)server_socket);
         return NULL;
     }
@@ -255,17 +246,16 @@ void *platform_tcp_server_create(_IN_ uint16_t port)
 }
 
 
-
-
 void *platform_tcp_server_accept(_IN_ void *server)
 {
+    require_action_exit(server == NULL, "[%s, %d]:Parameter error server == NULL", __func__, __LINE__);
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
     unsigned int addr_length = sizeof(addr);
-    long new_client;
+    int new_client;
 
-    if ((new_client = accept((long)server, (struct sockaddr*)&addr, &addr_length)) <= 0)
-    {
+    if ((new_client = accept((int)server, (struct sockaddr*)&addr, &addr_length)) <= 0) {
+        ESP_LOGE(TAG, "[%s, %d]:accept", __func__, __LINE__);
         return NULL;
     }
 
@@ -277,19 +267,20 @@ void *platform_tcp_server_accept(_IN_ void *server)
 
 void *platform_tcp_client_connect(_IN_ pplatform_netaddr_t netaddr)
 {
+    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
-    long sock;
+    int sock;
 
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
-    if (0 != network_create_socket(netaddr, SOCK_STREAM, &addr, &sock))
-    {
+    if (0 != network_create_socket(netaddr, SOCK_STREAM, &addr, &sock)) {
+        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
         return NULL;
     }
 
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
-    if (-1 == connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)))
-    {
+    if (-1 == connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
+        ESP_LOGE(TAG, "[%s, %d]:connect", __func__, __LINE__);
         platform_tcp_close((void *)sock);
         return NULL;
     }
@@ -301,10 +292,12 @@ void *platform_tcp_client_connect(_IN_ pplatform_netaddr_t netaddr)
 
 int platform_tcp_send(_IN_ void *handle, _IN_ const char *buffer, _IN_ uint32_t length)
 {
+    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int bytes_sent;
 
-    bytes_sent = send((long)handle, buffer, length, 0);
+    bytes_sent = send((int)handle, buffer, length, 0);
     return bytes_sent > 0 ? bytes_sent : -1;
 }
 
@@ -312,52 +305,48 @@ int platform_tcp_send(_IN_ void *handle, _IN_ const char *buffer, _IN_ uint32_t 
 
 int platform_tcp_recv(_IN_ void *handle, _OUT_ char *buffer, _IN_ uint32_t length)
 {
+    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
+    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
     // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int bytes_received;
 
-    bytes_received = recv((long)handle, buffer, length, 0);
+    bytes_received = recv((int)handle, buffer, length, 0);
 
     return bytes_received > 0 ? bytes_received : -1;
 }
 
 
-
-
 void platform_tcp_close(_IN_ void *handle)
 {
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
-    close((long)handle);
+    close((int)handle);
     //WSACleanup( );
 }
-
 
 
 int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
                     void *write_fds[PLATFORM_SOCKET_MAXNUMS],
                     int timeout_ms)
 {
+    require_action_exit(read_fds == NULL, "[%s, %d]:Parameter error read_fds == NULL", __func__, __LINE__);
+    // require_action_exit(write_fds == NULL, "[%s, %d]:Parameter error write_fds == NULL", __func__, __LINE__);
     int i, ret_code = -1;
     struct timeval timeout_value;
     struct timeval *ptimeval = &timeout_value;
     fd_set *pfd_read_set, *pfd_write_set;
 
-    if (PLATFORM_WAIT_INFINITE == timeout_ms)
-    {
+    if (PLATFORM_WAIT_INFINITE == timeout_ms) {
         ptimeval = NULL;
-    }
-    else
-    {
+    } else {
         ptimeval->tv_sec = timeout_ms / 1000;
         ptimeval->tv_usec = (timeout_ms % 1000) * 1000;
     }
     pfd_read_set = NULL;
     pfd_write_set = NULL;
 
-    if (NULL != read_fds)
-    {
+    if (NULL != read_fds) {
         pfd_read_set = malloc(sizeof(fd_set));
-        if (NULL == pfd_read_set)
-        {
+        if (NULL == pfd_read_set) {
+            ESP_LOGE(TAG, "[%s, %d]:pfd_read_set", __func__, __LINE__);
             goto do_exit;
         }
 
@@ -367,7 +356,7 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
         {
             if ( PLATFORM_INVALID_FD != read_fds[i] )
             {
-                FD_SET((long)read_fds[i], pfd_read_set);
+                FD_SET((int)read_fds[i], pfd_read_set);
             }
         }
     }
@@ -375,43 +364,35 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     if (NULL != write_fds)
     {
         pfd_write_set = malloc(sizeof(fd_set));
-        if (NULL == pfd_write_set)
-        {
+        if (NULL == pfd_write_set) {
+            ESP_LOGE(TAG, "[%s, %d]:pfd_write_set", __func__, __LINE__);
             goto do_exit;
         }
 
         FD_ZERO(pfd_write_set);
 
-        for ( i = 0; i < PLATFORM_SOCKET_MAXNUMS; ++i )
-        {
-            if ( PLATFORM_INVALID_FD != write_fds[i] )
-            {
-                FD_SET((long)write_fds[i], pfd_write_set);
+        for ( i = 0; i < PLATFORM_SOCKET_MAXNUMS; ++i ) {
+            if ( PLATFORM_INVALID_FD != write_fds[i] ) {
+                FD_SET((int)write_fds[i], pfd_write_set);
             }
         }
     }
     ret_code = select(FD_SETSIZE, pfd_read_set, pfd_write_set, NULL, ptimeval);
-    if (ret_code >= 0)
-    {
-        if (NULL != read_fds)
-        {
-            for ( i = 0; i < PLATFORM_SOCKET_MAXNUMS; ++i )
-            {
+    if (ret_code >= 0) {
+        if (NULL != read_fds) {
+            for ( i = 0; i < PLATFORM_SOCKET_MAXNUMS; ++i ) {
                 if (PLATFORM_INVALID_FD != read_fds[i]
-                        && !FD_ISSET((long)read_fds[i], pfd_read_set))
-                {
+                        && !FD_ISSET((int)read_fds[i], pfd_read_set)) {
+
                     read_fds[i] = PLATFORM_INVALID_FD;
                 }
             }
         }
 
-        if (NULL != write_fds)
-        {
-            for ( i = 0; i < PLATFORM_SOCKET_MAXNUMS; ++i )
-            {
+        if (NULL != write_fds) {
+            for ( i = 0; i < PLATFORM_SOCKET_MAXNUMS; ++i ) {
                 if (PLATFORM_INVALID_FD != write_fds[i]
-                        && !FD_ISSET((long)write_fds[i], pfd_write_set))
-                {
+                        && !FD_ISSET((int)write_fds[i], pfd_write_set)) {
                     write_fds[i] = PLATFORM_INVALID_FD;
                 }
             }
@@ -419,19 +400,8 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     }
 
 do_exit:
-    if (NULL != pfd_read_set)
-    {
-        free(pfd_read_set);
-    }
-
-    if (NULL != pfd_write_set)
-    {
-        free(pfd_write_set);
-    }
+    if (pfd_read_set) free(pfd_read_set);
+    if (pfd_write_set) free(pfd_write_set);
 
     return (ret_code >= 0) ? ret_code : -1;
 }
-
-
-
-
