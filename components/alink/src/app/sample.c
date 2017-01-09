@@ -145,18 +145,14 @@ int alink_device_post_raw_data(void)
 	int len = 8, ret = 0;
 	char rawdata[8] = { 0 };
 	if (get_device_state()) {
-		printf("%s %d \n", __FUNCTION__, __LINE__);
 		get_device_status(rawdata, len);
-		printf("%s %d \n", __FUNCTION__, __LINE__);
 		ret = alink_post_device_rawdata(rawdata, len);
-		printf("%s %d \n", __FUNCTION__, __LINE__);
 		set_device_state(0);
 		if (ret) {
 			printf("post failed!\n");
 		} else {
 			printf("dev post raw data success!\n");
 		}
-		printf("%s %d \n", __FUNCTION__, __LINE__);
 	}
 	/* do your job end */
 	return ret;
@@ -164,7 +160,6 @@ int alink_device_post_raw_data(void)
 int rawdata_get_callback(const char *in_rawdata, int in_len, char *out_rawdata, int *out_len)
 {
 	int ret = 0;
-	printf("%s %d \n", __FUNCTION__, __LINE__);
 	set_device_state(1);
 	/*do your job end! */
 	return ret;
@@ -175,7 +170,6 @@ int rawdata_set_callback(char *rawdata, int len)
 	/* TODO: */
 	/*get cmd from server, do your job here! */
 	int ret = 0;
-	printf("%s %d \n", __FUNCTION__, __LINE__);
 	ret = execute_cmd(rawdata, len);
 	/* do your job end! */
 	set_device_state(1);
@@ -249,15 +243,12 @@ void alink_demo()
 	alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
 
 	while (sample_running) {
-		printf("%s %d \n", __FUNCTION__, __LINE__);
 
 		alink_device_post_raw_data();
-		printf("%s %d \n", __FUNCTION__, __LINE__);
 		// int count = pxCurrentTCB[ xPortGetCoreID() ]->uxCriticalNesting;
 		// printf("uxCriticalNesting: %d ")
 		// platform_msleep(1000);
 		vTaskDelay(500/portTICK_RATE_MS);
-		printf("%s %d \n", __FUNCTION__, __LINE__);
 	}
 	printf("=========== alink end ================");
 	alink_end();

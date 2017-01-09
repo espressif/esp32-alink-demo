@@ -26,8 +26,8 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
     SSL *ssl;
     int socket = (int)tcp_fd;
     int ret = -1;
-    printf("tcp_fd: %d, server_cert: %p, server_cert_len: %d\n",
-           socket , server_cert, server_cert_len);
+    ESP_LOGD(TAG, "[%s, %d]:tcp_fd: %d, server_cert: %p, server_cert_len: %d\n",
+             __func__, __LINE__, socket, server_cert, server_cert_len);
 
     ctx = SSL_CTX_new(TLSv1_1_client_method());
     ssl = SSL_new(ctx);
@@ -39,8 +39,10 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
     require_action_NULL(ret == -1, "[%s, %d]:SSL_add_client_CA", __func__, __LINE__);
 
     ret = SSL_connect(ssl);
-    require_action_NULL(ret == -1, "[%s, %d]:SSL_add_client_CA", __func__, __LINE__);
+    require_action_NULL(ret == -1, "[%s, %d]:SSL_connect", __func__, __LINE__);
 
+    ESP_LOGE(TAG, "[%s, %d]:SSL_shutdown: ssl: %p",
+            __func__, __LINE__, ssl);
     return (void *)(ssl);
 }
 
@@ -50,7 +52,7 @@ int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
 
     int cnt = 0;
-    cnt = SSL_write((SSL*)ssl, buffer, length);
+    cnt = SSL_write((SSL *)ssl, buffer, length);
     return (cnt > 0) ? cnt : -1;
 }
 
@@ -68,14 +70,15 @@ int platform_ssl_close(_IN_ void *ssl)
     require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
     int ret = -1;
     ret = SSL_shutdown((SSL *)ssl);
-    if (ret != 0) {
-        ESP_LOGE(TAG, "[%s, %d]:SSL_shutdown", __func__, __LINE__);
+    if (ret != 1) {
+        ESP_LOGE(TAG, "[%s, %d]:SSL_shutdown: ret:%d, ssl: %p",
+            __func__, __LINE__, ret, ssl);
         return -1;
     }
 
     int fd = SSL_get_fd((SSL *)ssl);
-    if (ret != 0) {
-        ESP_LOGE(TAG, "[%s, %d]:SSL_get_fd", __func__, __LINE__);
+    if (fd < 0) {
+        ESP_LOGE(TAG, "[%s, %d]:SSL_get_fd:%d", __func__, __LINE__, fd);
         return -1;
     }
     close(fd);

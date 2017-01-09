@@ -44,7 +44,7 @@ task_infor_t task_infor[] = {
     {"alink_main_thread", NULL},
     {"send_worker", NULL},
     {"callback_thread", NULL},
-    {"firmware_upgrade_pthread", NULL},
+    {"firmware_upgrade_pthread", NULL}
 };
 
 void platform_printf(const char *fmt, ...)
@@ -125,10 +125,8 @@ int platform_semaphore_wait(_IN_ void *sem, _IN_ uint32_t timeout_ms)
     //Take the Semaphore
     if (pdTRUE == xSemaphoreTake(sem, timeout_ms / portTICK_RATE_MS)) {
         return 0;
-    } else {
-        return -1;
     }
-
+    return -1;
 }
 
 void platform_semaphore_post(_IN_ void *sem)
@@ -151,26 +149,25 @@ int platform_thread_get_stack_size(_IN_ const char *thread_name)
 {
     require_action_exit(thread_name == NULL, "[%s, %d]:Parameter error thread_name == NULL", __func__, __LINE__);
     if (0 == strcmp(thread_name, "alink_main_thread")) {
-        ESP_LOGI(TAG, "get alink_main_thread");
+        ESP_LOGD(TAG, "get alink_main_thread");
         return 0xc00;
     } else if (0 == strcmp(thread_name, "wsf_worker_thread")) {
-        ESP_LOGI(TAG, "get wsf_worker_thread");
+        ESP_LOGD(TAG, "get wsf_worker_thread");
         return 0x2100;
     } else if (0 == strcmp(thread_name, "firmware_upgrade_pthread")) {
-        ESP_LOGI(TAG, "get firmware_upgrade_pthread");
+        ESP_LOGD(TAG, "get firmware_upgrade_pthread");
         return 0xc00;
     } else if (0 == strcmp(thread_name, "send_worker")) {
-        ESP_LOGI(TAG, "get send_worker");
+        ESP_LOGD(TAG, "get send_worker");
         return 0x800;
     } else if (0 == strcmp(thread_name, "callback_thread")) {
-        ESP_LOGI(TAG, "get callback_thread");
+        ESP_LOGD(TAG, "get callback_thread");
         return 0x800;
     } else {
-        ESP_LOGI(TAG, "get othrer thread");
+        ESP_LOGE(TAG, "get othrer thread: %s", thread_name);
         return 0x800;
     }
-
-    assert(0);
+    esp_restart();;
 }
 
 /************************ task ************************/
@@ -192,13 +189,6 @@ static int get_task_name_location(const char * name)
     return -1;
 }
 
-// static void  platform_get_task_handler(uint32_t pos, void** handler)
-// {
-//     ALINK_ADAPTER_CONFIG_ASSERT(pos != -1);
-//     ALINK_ADAPTER_CONFIG_ASSERT(pos <= PLATFORM_TABLE_CONTENT_CNT(task_infor) - 1);
-//     *handler = (void*)task_infor[pos].handler;
-// }
-
 static bool set_task_name_handler(uint32_t pos, void * handler)
 {
     task_infor[pos].handler = handler;
@@ -215,9 +205,10 @@ int platform_thread_create(_OUT_ void **thread,
 {
     require_action_exit(name == NULL, "[%s, %d]:Parameter error name == NULL", __func__, __LINE__);
     require_action_exit(stack_size == 0, "[%s, %d]:Parameter error stack_size == 0", __func__, __LINE__);
-    printf("task name: %s, stack_size: %d=\n", name, stack_size);
+    printf("task name: %s, stack_size: %d=\n", name, stack_size * 2);
 
-    if (pdTRUE == xTaskCreatePinnedToCore(start_routine, name, stack_size*2, arg, ESP_DEFAULU_TASK_PRIOTY, thread, 0)) {
+    // if (pdTRUE == xTaskCreatePinnedToCore((TaskFunction_t)start_routine, name, stack_size * 2, arg, ESP_DEFAULU_TASK_PRIOTY, thread, 0)) {
+    if (pdTRUE == xTaskCreate((TaskFunction_t)start_routine, name, stack_size * 2, arg, ESP_DEFAULU_TASK_PRIOTY, thread)) {
         int pos = get_task_name_location(name);
         if  (-1 != pos) {
             set_task_name_handler(pos, *thread);
@@ -231,7 +222,7 @@ int platform_thread_create(_OUT_ void **thread,
 
 void platform_thread_exit(_IN_ void *thread)
 {
-    ets_printf("++++++++++++ [%s, %d]: thread:%p ++++++++++\n", __func__, __LINE__, thread);
+    // ets_printf("++++++++++++ [%s, %d]: thread:%p ++++++++++\n", __func__, __LINE__, thread);
     vTaskDelete(thread);
 }
 
@@ -293,13 +284,11 @@ char *platform_get_module_name(_OUT_ char name_str[PLATFORM_MODULE_NAME_LEN])
 
 int platform_sys_net_is_ready(void)
 {
-    ets_printf("=== [%s, %d] ===\n", __func__, __LINE__);
     return 1;
 }
 
 void platform_sys_reboot(void)
 {
-    ets_printf("=== [%s, %d] ===\n", __func__, __LINE__);
     esp_restart();
 }
 

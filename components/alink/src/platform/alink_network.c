@@ -91,7 +91,6 @@ void *platform_udp_server_create(_IN_ uint16_t port)
 
 void *platform_udp_client_create(void)
 {
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
     int sock;
     platform_netaddr_t netaddr = {NULL, 0};
@@ -107,7 +106,6 @@ void *platform_udp_client_create(void)
 void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
 {
     require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int option = 1;
     struct sockaddr_in addr;
     int sock;
@@ -197,7 +195,6 @@ int platform_udp_recvfrom(
     require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
     // require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int ret_code;
     struct sockaddr_in addr;
     unsigned int addr_len = sizeof(addr);
@@ -220,7 +217,6 @@ int platform_udp_recvfrom(
 
 void *platform_tcp_server_create(_IN_ uint16_t port)
 {
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
     int server_socket;
     platform_netaddr_t netaddr = {NULL, port};
@@ -249,7 +245,6 @@ void *platform_tcp_server_create(_IN_ uint16_t port)
 void *platform_tcp_server_accept(_IN_ void *server)
 {
     require_action_exit(server == NULL, "[%s, %d]:Parameter error server == NULL", __func__, __LINE__);
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
     unsigned int addr_length = sizeof(addr);
     int new_client;
@@ -268,17 +263,14 @@ void *platform_tcp_server_accept(_IN_ void *server)
 void *platform_tcp_client_connect(_IN_ pplatform_netaddr_t netaddr)
 {
     require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     struct sockaddr_in addr;
     int sock;
 
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     if (0 != network_create_socket(netaddr, SOCK_STREAM, &addr, &sock)) {
         ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
         return NULL;
     }
 
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     if (-1 == connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
         ESP_LOGE(TAG, "[%s, %d]:connect", __func__, __LINE__);
         platform_tcp_close((void *)sock);
@@ -294,7 +286,6 @@ int platform_tcp_send(_IN_ void *handle, _IN_ const char *buffer, _IN_ uint32_t 
 {
     require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int bytes_sent;
 
     bytes_sent = send((int)handle, buffer, length, 0);
@@ -307,7 +298,6 @@ int platform_tcp_recv(_IN_ void *handle, _OUT_ char *buffer, _IN_ uint32_t lengt
 {
     require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
-    // printf("=== [%s, %d] ===\n", __func__, __LINE__);
     int bytes_received;
 
     bytes_received = recv((int)handle, buffer, length, 0);
