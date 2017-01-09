@@ -14,7 +14,7 @@
 #include "platform/platform.h"
 
 static SSL_CTX *ctx = NULL;
-static const char *TAG = "alink ssl";
+static const char *TAG = "alink_ssl";
 #define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
 #define require_action_NULL(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); return NULL;}
 
@@ -41,8 +41,7 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
     ret = SSL_connect(ssl);
     require_action_NULL(ret == -1, "[%s, %d]:SSL_connect", __func__, __LINE__);
 
-    ESP_LOGE(TAG, "[%s, %d]:SSL_shutdown: ssl: %p",
-            __func__, __LINE__, ssl);
+    ESP_LOGD(TAG, "[%s, %d]:ssl: %p", __func__, __LINE__, ssl);
     return (void *)(ssl);
 }
 
@@ -51,18 +50,20 @@ int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
     require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
 
-    int cnt = 0;
+    int cnt = -1;
     cnt = SSL_write((SSL *)ssl, buffer, length);
-    return (cnt > 0) ? cnt : -1;
+    return cnt;
+    // return (cnt > 0) ? cnt : -1;
 }
 
 int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
 {
     require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
-    int cnt = 0;
+    int cnt = -1;
     cnt = SSL_read((SSL*)ssl, buffer, length);
-    return cnt > 0 ? cnt : -1;
+    return cnt;
+    // return cnt > 0 ? cnt : -1;
 }
 
 int platform_ssl_close(_IN_ void *ssl)
@@ -72,7 +73,7 @@ int platform_ssl_close(_IN_ void *ssl)
     ret = SSL_shutdown((SSL *)ssl);
     if (ret != 1) {
         ESP_LOGE(TAG, "[%s, %d]:SSL_shutdown: ret:%d, ssl: %p",
-            __func__, __LINE__, ret, ssl);
+                 __func__, __LINE__, ret, ssl);
         return -1;
     }
 

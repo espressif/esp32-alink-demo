@@ -77,8 +77,6 @@ int set_device_state(int state)
 
 int sample_running = ALINK_TRUE;
 
-
-
 /* this sample save cmd value to virtual_device*/
 static int execute_cmd(const char *rawdata, int len)
 {
@@ -223,7 +221,7 @@ void alink_fill_deviceinfo(struct device_info *deviceinfo)
 
 // extern  TCB_t * pxCurrentTCB[ portNUM_PROCESSORS ];
 
-void alink_demo()
+void alink_passthroug(void *arg)
 {
 	struct device_info *main_dev;
 	main_dev = platform_malloc(sizeof(struct device_info));
@@ -253,5 +251,6 @@ void alink_demo()
 	printf("=========== alink end ================");
 	alink_end();
 	platform_mutex_destroy(alink_sample_mutex);
+	vTaskDelete(NULL);
 }
 

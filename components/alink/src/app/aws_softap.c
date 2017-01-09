@@ -68,15 +68,10 @@
 #ifndef	info
 #define info(format, ...)	printf(format, ##__VA_ARGS__)
 #endif
-
-#define	STR_SSID_LEN		(32 + 1)
-#define STR_PASSWD_LEN		(64 + 1)
-char aws_ssid[STR_SSID_LEN];
-char aws_passwd[STR_PASSWD_LEN];
 unsigned char aws_bssid[6];
 
 /* json info parser */
-int get_ssid_and_passwd(char *msg)
+static int get_ssid_and_passwd(char *msg, wifi_config_t  *wifi_config)
 {
 	char *ptr, *end, *name;
 	int len;
@@ -93,9 +88,9 @@ int get_ssid_and_passwd(char *msg)
 	end = strchr(ptr, '"');
 	len = end - ptr;
 
-	assert(len < sizeof(aws_ssid));
-	strncpy(aws_ssid, ptr, len);
-	aws_ssid[len] = '\0';
+	// assert(len < sizeof(aws_ssid));
+	memcpy(wifi_config->sta.ssid, ptr, len);
+	wifi_config->sta.ssid[len] = '\0';
 
 	//passwd
 	name = "\"passwd\":";
@@ -110,9 +105,9 @@ int get_ssid_and_passwd(char *msg)
 	end = strchr(ptr, '"');
 	len = end - ptr;
 
-	assert(len < sizeof(aws_passwd));
-	strncpy(aws_passwd, ptr, len);
-	aws_passwd[len] = '\0';
+	// assert(len < sizeof(wifi_config->sta.password));
+	memcpy(wifi_config->sta.password, ptr, len);
+	wifi_config->sta.password[len] = '\0';
 
 	//bssid-mac
 	name = "\"bssid\":";
@@ -133,7 +128,7 @@ exit:
 }
 
 //setup softap server
-int aws_softap_tcp_server(void)
+static int aws_softap_tcp_server(wifi_config_t *wifi_config)
 {
 	struct sockaddr_in server, client;
 	socklen_t socklen = sizeof(client);
@@ -155,7 +150,7 @@ int aws_softap_tcp_server(void)
 	server.sin_addr.s_addr = inet_addr(SOFTAP_GATEWAY_IP);
 	server.sin_port = htons(SOFTAP_TCP_SERVER_PORT);
 
-	// ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 	// assert(!ret);
 
 	ret = bind(fd, (struct sockaddr *)&server, sizeof(server));
@@ -184,7 +179,7 @@ int aws_softap_tcp_server(void)
 	char device_mac[PLATFORM_MAC_LEN];
 	product_get_model(product_model);
 	platform_wifi_get_mac(device_mac);
-	ret = get_ssid_and_passwd(buf);
+	ret = get_ssid_and_passwd(buf, wifi_config);
 	if (!ret) {
 		snprintf(msg, buf_size,
 		         "{\"code\":1000, \"msg\":\"format ok\", \"model\":\"%s\", \"mac\":\"%s\"}",
@@ -221,19 +216,18 @@ int aws_softap_tcp_server(void)
  * SSID: 32 ascii char at most
  * softap timeout: 5min
  */
-void aws_softap_setup(void)
+static void aws_softap_setup(void)
 {
 	/*
 	Step1: Softap config
 	*/
-	char ssid[STR_SSID_LEN] = {0};
+	char ssid[32 + 1] = {0};
 	char product_model[PRODUCT_MODEL_LEN];
 	product_get_model(product_model);
 	//ssid: max 32Bytes(excluding '\0')
-	snprintf(ssid, STR_SSID_LEN, "alink_%s", product_model);
 	wifi_config_t wifi_config;
 	esp_wifi_get_config(WIFI_IF_AP, &wifi_config);
-	memcpy(wifi_config.ap.ssid, ssid, sizeof(ssid));
+	snprintf((char *)wifi_config.ap.ssid, sizeof(wifi_config.ap.ssid), "alink_%s", product_model);
 	// memcpy(wifi_config.ap.password, DONGLE_WIFI_PWD, sizeof(DONGLE_WIFI_PWD));
 	wifi_config.ap.ssid_len        = strlen(ssid);
 	wifi_config.ap.channel         = 6;
@@ -260,36 +254,22 @@ void aws_softap_setup(void)
 	tcpip_adapter_start(TCPIP_ADAPTER_IF_AP, ap_mac, &ip_info);
 }
 
-void aws_softap_exit(void)
+static void aws_softap_exit(void)
 {
 	ESP_ERROR_CHECK( tcpip_adapter_stop(TCPIP_ADAPTER_IF_AP) );
 	ESP_ERROR_CHECK( esp_wifi_stop() );
 }
 
-int vendor_connect_ap(char *ssid, char *passwd);
-void aws_connect_to_ap(char* ssid, char* password)
+BaseType_t aws_softap_init(wifi_config_t * wifi_config)
 {
-	printf("aws_connect_to ap ssid:%s,password:%s\n", ssid, password);
-	vendor_connect_ap(ssid, password);
-}
-
-int aws_softap_main(void)
-{
-	printf("********ENTER SOFTAP MODE******\n");
 	/* prepare and setup softap */
 	aws_softap_setup();
 
 	/* tcp server to get ssid & passwd */
-	aws_softap_tcp_server();
+	aws_softap_tcp_server(wifi_config);
 
 	aws_softap_exit();
-
-	aws_connect_to_ap(aws_ssid, aws_passwd);
-
-	/* after dhcp ready, send notification to APP */
-	aws_notify_app();
-
-	return 0;
+	return pdTRUE;
 }
 
 #endif

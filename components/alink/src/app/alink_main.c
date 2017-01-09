@@ -23,53 +23,125 @@
 #include "string.h"
 #include "platform.h"
 #include "product.h"
+#include "aws_smartconfig.h"
+#include "aws_softap.h"
 
-int vendor_connect_ap(char *ssid, char *passwd);
-void vendor_wifi_init();
-int aws_softap_main(void);
-void alink_demo();
+#define WIFI_WAIT_TIME      (60 * 1000 / portTICK_RATE_MS)
+static SemaphoreHandle_t xSemConnet = NULL;
+void alink_passthroug(void *arg);
 
-
-int aws_sample(void)
+BaseType_t alink_read_wifi_config(wifi_config_t *wifi_config)
 {
-    char ssid[32 + 1];
-    char passwd[64 + 1];
-    char bssid[6];
-    char auth;
-    char encry;
-    char channel;
-    int ret;
+    BaseType_t ret     = -1;
+    nvs_handle handle = 0;
+    size_t length = sizeof(wifi_config_t);
+    if (wifi_config == NULL) return pdFALSE;
 
-    char product_model[PRODUCT_MODEL_LEN];
-    char product_secret[PRODUCT_SECRET_LEN];
-    char device_mac[PLATFORM_MAC_LEN];
+    ret = nvs_open("ALINK", NVS_READWRITE, &handle);
+    if (ret != 0) return pdFALSE;
+    ret = nvs_get_blob(handle, "wifi_config", wifi_config, &length);
+    nvs_close(handle);
+    return (ret) ? pdFALSE : pdTRUE;
+}
 
-    product_get_secret(product_secret);
-    product_get_model(product_model);
-    platform_wifi_get_mac(device_mac);
+BaseType_t alink_write_wifi_config(wifi_config_t *wifi_config)
+{
+    BaseType_t ret     = -1;
+    nvs_handle handle = 0;
+    if (wifi_config == NULL) return pdFALSE;
 
-    aws_start(product_model, product_secret, device_mac, NULL);
-    ret = aws_get_ssid_passwd(&ssid[0], &passwd[0], &bssid[0], &auth, &encry,
-                              &channel);
-    if (!ret) {
-        printf("alink wireless setup timeout!\n");
-        ret = -1;
-        goto out;
-    }
-    printf("ssid:%s, passwd:%s\n", ssid, passwd);
-    vendor_connect_ap(ssid, passwd);
-    aws_notify_app();
-    ret = 0;
-out:
-    aws_destroy();
-    return ret;
+    ret = nvs_open("ALINK", NVS_READWRITE, &handle);
+    if (ret != 0) return pdFALSE;
+    ret = nvs_set_blob(handle, "wifi_config", wifi_config, sizeof(wifi_config_t));
+    nvs_commit(handle);
+    nvs_close(handle);
+    return (ret) ? pdFALSE : pdTRUE;
 }
 
 
-void startdemo_task(void *arg)
+BaseType_t alink_erase_wifi_config()
 {
-    alink_demo();
-    vTaskDelete(NULL);
+    esp_err_t ret     = -1;
+    nvs_handle handle = 0;
+
+    ret = nvs_open("ALINK", NVS_READWRITE, &handle);
+    if (ret != 0) return pdFALSE;
+    ret = nvs_erase_key(handle, "wifi_config");
+    nvs_commit(handle);
+    nvs_close(handle);
+    return (ret) ? pdFALSE : pdTRUE;
+}
+
+
+static esp_err_t event_handler(void *ctx, system_event_t *event)
+{
+    if (xSemConnet == NULL)
+        xSemConnet = xSemaphoreCreateBinary();
+    switch (event->event_id) {
+    case SYSTEM_EVENT_STA_START:
+        esp_wifi_connect();
+        break;
+    case SYSTEM_EVENT_STA_GOT_IP:
+        xSemaphoreGive(xSemConnet);
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        /* This is a workaround as ESP32 WiFi libs don't currently
+           auto-reassociate. */
+        esp_wifi_connect();
+        break;
+    default:
+        break;
+    }
+    return ESP_OK;
+}
+
+static BaseType_t wifi_sta_connect_ap(wifi_config_t *wifi_config, TickType_t ticks_to_wait)
+{
+    printf("WiFi SSID: %s, password: %s\n", wifi_config->ap.ssid, wifi_config->ap.password);
+    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, wifi_config) );
+    ESP_ERROR_CHECK( esp_wifi_start() );
+
+    if (xSemConnet == NULL)
+        xSemConnet = xSemaphoreCreateBinary();
+    return xSemaphoreTake(xSemConnet, ticks_to_wait);
+}
+
+
+BaseType_t alink_connect_ap()
+{
+    BaseType_t ret = pdFALSE;
+
+    wifi_config_t wifi_config;
+    esp_event_loop_set_cb(event_handler, NULL);
+    xSemConnet = xSemaphoreCreateBinary();
+
+    ret = alink_read_wifi_config(&wifi_config);
+    if (ret == pdTRUE) {
+        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == pdTRUE)
+            return pdTRUE;
+    }
+    esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
+
+    ret = aws_smartconfig_init(&wifi_config);
+    if (ret == pdTRUE) {
+        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == pdTRUE)
+            goto EXIT;
+    }
+
+    printf("********ENTER SOFTAP MODE******\n");
+    ret = aws_softap_init(&wifi_config);
+    if (ret == pdTRUE) {
+        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == pdTRUE)
+            goto EXIT;
+    }
+
+    return pdFALSE;
+EXIT:
+    alink_write_wifi_config(&wifi_config);
+    aws_notify_app();
+    aws_destroy();
+    return pdTRUE;
 }
 
 
@@ -81,11 +153,6 @@ void startdemo_task(void *arg)
 *******************************************************************************/
 void esp_alink_init()
 {
-    int ret = aws_sample(); // alink smart config start
-    if (ret == -1) { // alink smarconfig err,enter softap config net mode
-        printf("enter softap config net mode\n");
-        aws_softap_main();
-    }
-    xTaskCreate(startdemo_task, "startdemo_task", 4096, NULL, 4, NULL);
+    alink_connect_ap();
+    xTaskCreate(alink_passthroug, "alink_passthroug", 4096, NULL, 4, NULL);
 }
-
