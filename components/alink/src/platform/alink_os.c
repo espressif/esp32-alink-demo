@@ -205,7 +205,7 @@ int platform_thread_create(_OUT_ void **thread,
 {
     require_action_exit(name == NULL, "[%s, %d]:Parameter error name == NULL", __func__, __LINE__);
     require_action_exit(stack_size == 0, "[%s, %d]:Parameter error stack_size == 0", __func__, __LINE__);
-    printf("task name: %s, stack_size: %d=\n", name, stack_size * 2);
+    printf("task name: %s, stack_size: %d\n", name, stack_size * 2);
 
     // if (pdTRUE == xTaskCreatePinnedToCore((TaskFunction_t)start_routine, name, stack_size * 2, arg, ESP_DEFAULU_TASK_PRIOTY, thread, 0)) {
     if (pdTRUE == xTaskCreate((TaskFunction_t)start_routine, name, stack_size * 2, arg, ESP_DEFAULU_TASK_PRIOTY, thread)) {

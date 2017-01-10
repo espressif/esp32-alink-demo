@@ -1,3 +1,4 @@
+#if 0
 /*
  * Copyright (c) 2014-2015 Alibaba Group. All rights reserved.
  *
@@ -254,3 +255,4 @@ void alink_passthroug(void *arg)
 	vTaskDelete(NULL);
 }
 
+#endif

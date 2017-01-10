@@ -28,7 +28,7 @@
 //#include <string.h>
 #include "product/product.h"
 
-#define PASS_THROUGH
+// #define PASS_THROUGH
 
 //TODO: update these product info
 #define product_dev_name        "ALINKTEST"

@@ -29,6 +29,8 @@
 #define WIFI_WAIT_TIME      (60 * 1000 / portTICK_RATE_MS)
 static SemaphoreHandle_t xSemConnet = NULL;
 void alink_passthroug(void *arg);
+void alink_json(void *arg);
+
 
 BaseType_t alink_read_wifi_config(wifi_config_t *wifi_config)
 {
@@ -95,11 +97,19 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
     return ESP_OK;
 }
 
-static BaseType_t wifi_sta_connect_ap(wifi_config_t *wifi_config, TickType_t ticks_to_wait)
+static BaseType_t wifi_sta_connect_ap(wifi_config_t *config, TickType_t ticks_to_wait)
 {
-    printf("WiFi SSID: %s, password: %s\n", wifi_config->ap.ssid, wifi_config->ap.password);
+    wifi_config_t wifi_config;
+    esp_event_loop_set_cb(event_handler, NULL);
+    esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
+
+    // ESP_ERROR_CHECK( esp_wifi_stop() );
+    printf("WiFi SSID: %s, password: %s\n", config->ap.ssid, config->ap.password);
+    memcpy(wifi_config.sta.ssid, config->ap.ssid, sizeof(wifi_config.sta.ssid));
+    memcpy(wifi_config.sta.password, config->ap.ssid, sizeof(wifi_config.sta.password));
+
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, wifi_config) );
+    ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
 
     if (xSemConnet == NULL)
@@ -113,7 +123,6 @@ BaseType_t alink_connect_ap()
     BaseType_t ret = pdFALSE;
 
     wifi_config_t wifi_config;
-    esp_event_loop_set_cb(event_handler, NULL);
     xSemConnet = xSemaphoreCreateBinary();
 
     ret = alink_read_wifi_config(&wifi_config);
@@ -154,5 +163,6 @@ EXIT:
 void esp_alink_init()
 {
     alink_connect_ap();
-    xTaskCreate(alink_passthroug, "alink_passthroug", 4096, NULL, 4, NULL);
+    xTaskCreate(alink_json, "alink_json", 4096, NULL, 4, NULL);
+    // xTaskCreate(alink_passthroug, "alink_passthroug", 4096, NULL, 4, NULL);
 }

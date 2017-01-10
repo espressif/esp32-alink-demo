@@ -29,8 +29,11 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
     ESP_LOGD(TAG, "[%s, %d]:tcp_fd: %d, server_cert: %p, server_cert_len: %d\n",
              __func__, __LINE__, socket, server_cert, server_cert_len);
 
+
     ctx = SSL_CTX_new(TLSv1_1_client_method());
+    require_action_NULL(ctx == NULL, "[%s, %d]:SSL_CTX_new", __func__, __LINE__)
     ssl = SSL_new(ctx);
+    require_action_NULL(ssl == NULL, "[%s, %d]:SSL_new", __func__, __LINE__);
     SSL_set_fd(ssl, socket);
     X509 *ca_cert = d2i_X509(NULL, (unsigned char *)server_cert, server_cert_len);
     require_action_NULL(ca_cert == NULL, "[%s, %d]:d2i_X509", __func__, __LINE__);
@@ -47,23 +50,27 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
 
 int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
 {
-    require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
+    // require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
+    if (ssl == NULL) {
+        ESP_LOGE(TAG, "[%s, %d]:Parameter error ssl: %p", __func__, __LINE__, ssl);
+        return -1;
+    }
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
 
-    int cnt = -1;
-    cnt = SSL_write((SSL *)ssl, buffer, length);
-    return cnt;
-    // return (cnt > 0) ? cnt : -1;
+    int ret = -1;
+    ret = SSL_write((SSL *)ssl, buffer, length);
+    if (ret <= 0) ESP_LOGE(TAG, "[%s, %d]:SSL_write:%d", __func__, __LINE__, ret);
+    return ret;
 }
 
 int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
 {
     require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
-    int cnt = -1;
-    cnt = SSL_read((SSL*)ssl, buffer, length);
-    return cnt;
-    // return cnt > 0 ? cnt : -1;
+    int ret = -1;
+    ret = SSL_read((SSL*)ssl, buffer, length);
+    if (ret <= 0) ESP_LOGE(TAG, "[%s, %d]:SSL_read:%d", __func__, __LINE__, ret);
+    return ret;
 }
 
 int platform_ssl_close(_IN_ void *ssl)
@@ -72,17 +79,11 @@ int platform_ssl_close(_IN_ void *ssl)
     int ret = -1;
     ret = SSL_shutdown((SSL *)ssl);
     if (ret != 1) {
-        ESP_LOGE(TAG, "[%s, %d]:SSL_shutdown: ret:%d, ssl: %p",
+        ESP_LOGW(TAG, "[%s, %d]:SSL_shutdown: ret:%d, ssl: %p",
                  __func__, __LINE__, ret, ssl);
-        return -1;
     }
 
     int fd = SSL_get_fd((SSL *)ssl);
-    if (fd < 0) {
-        ESP_LOGE(TAG, "[%s, %d]:SSL_get_fd:%d", __func__, __LINE__, fd);
-        return -1;
-    }
-    close(fd);
 
     if (ssl) {
         SSL_free(ssl);
@@ -94,5 +95,7 @@ int platform_ssl_close(_IN_ void *ssl)
         ctx = NULL;
     }
 
-    return 0;
+    if (fd >= 0) close(fd);
+    else ESP_LOGE(TAG, "[%s, %d]:SSL_get_fd:%d", __func__, __LINE__, fd);
+    return ret;
 }

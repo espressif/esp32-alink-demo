@@ -24,6 +24,11 @@
  * INCLUDING THE WARRANTIES OF MERCHANTIBILITY, FITNESS FOR A PARTICULAR
  * PURPOSE, TITLE, AND NONINFRINGEMENT.
  */
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "lwip/sockets.h"
+
 #include "platform/platform.h"
 #include "product/product.h"
 #include "alink_export.h"
@@ -34,33 +39,34 @@
 void *alink_sample_mutex;
 /*do your job here*/
 struct virtual_dev {
-	char power;
-	char temp_value;
-	char light_value;
-	char time_delay;
-	char work_mode;
+    char power;
+    char temp_value;
+    char light_value;
+    char time_delay;
+    char work_mode;
 } virtual_device = {
-0x01, 0x30, 0x50, 0, 0x01};
-
-char *device_attr[5] = { "OnOff_Power", "Color_Temperature", "Light_Brightness",
-	"TimeDelay_PowerOff", "WorkMode_MasterLight"
+    0x01, 0x30, 0x50, 0, 0x01
 };
+
+static char *device_attr[5] = { "OnOff_Power", "Color_Temperature", "Light_Brightness",
+                         "TimeDelay_PowerOff", "WorkMode_MasterLight"
+                       };
 
 const char *main_dev_params =
     "{\"OnOff_Power\": { \"value\": \"%d\" }, \"Color_Temperature\": { \"value\": \"%d\" }, \"Light_Brightness\": { \"value\": \"%d\" }, \"TimeDelay_PowerOff\": { \"value\": \"%d\"}, \"WorkMode_MasterLight\": { \"value\": \"%d\"}}";
 static char device_status_change = 1;
 
 
-int get_device_state()
+static int get_device_state()
 {
-    int ret=0;
+    int ret = 0;
     platform_mutex_lock(alink_sample_mutex);
     ret = device_status_change;
     platform_mutex_unlock(alink_sample_mutex);
     return ret;
 }
 
-int set_device_state(int state)
+static int set_device_state(int state)
 {
     platform_mutex_lock(alink_sample_mutex);
     device_status_change = state;
@@ -108,142 +114,140 @@ static int alink_device_post_data(alink_down_cmd_ptr down_cmd)
 }
 
 /* do your job end */
-int sample_running = ALINK_TRUE;
-int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
+static int sample_running = ALINK_TRUE;
+static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
 {
     int attrLen = 0, valueLen = 0, value = 0, i = 0;
-    char *valueStr=NULL, *attrStr=NULL;
+    char *valueStr = NULL, *attrStr = NULL;
 
     /* do your job here */
     printf("%s %d \n", __FUNCTION__, __LINE__);
-    printf("%s %d\n%s\n", down_cmd->uuid, down_cmd->method,down_cmd->param);
+    printf("%s %d\n%s\n", down_cmd->uuid, down_cmd->method, down_cmd->param);
     set_device_state(1);
 
     for (i = 0; i < 5; i++) {
         attrStr = alink_JsonGetValueByName(down_cmd->param, strlen(down_cmd->param), device_attr[i], &attrLen, 0);
         valueStr = alink_JsonGetValueByName(attrStr, attrLen, "value", &valueLen, 0);
 
-        if (valueStr && valueLen>0) {
-            char lastChar = *(valueStr+valueLen);
-            *(valueStr+valueLen) = 0;
+        if (valueStr && valueLen > 0) {
+            char lastChar = *(valueStr + valueLen);
+            *(valueStr + valueLen) = 0;
             value = atoi(valueStr);
-            *(valueStr+valueLen) = lastChar;
+            *(valueStr + valueLen) = lastChar;
             switch (i) {
-                case 0:
-                    virtual_device.power = value;
-                    break;
-                case 1:
-                    virtual_device.temp_value = value;
-                    break;
-                case 2:
-                    virtual_device.light_value = value;
-                    break;
-                case 3:
-                    virtual_device.time_delay = value;
-                    break;
-                case 4:
-                    virtual_device.work_mode = value;
-                    break;
-                default:
-                	break;
+            case 0:
+                virtual_device.power = value;
+                break;
+            case 1:
+                virtual_device.temp_value = value;
+                break;
+            case 2:
+                virtual_device.light_value = value;
+                break;
+            case 3:
+                virtual_device.time_delay = value;
+                break;
+            case 4:
+                virtual_device.work_mode = value;
+                break;
+            default:
+                break;
             }
         }
     }
-    // ²»ÄÜ×èÈû
+    // ä¸èƒ½é˜»å¡ž
     return 0;
     /* do your job end! */
 }
-int main_dev_get_device_status_callback(alink_down_cmd_ptr down_cmd)
+
+static int main_dev_get_device_status_callback(alink_down_cmd_ptr down_cmd)
 {
-	/* do your job here */
-	printf("%s %d \n", __FUNCTION__, __LINE__);
-	printf("%s %d\n%s\n", down_cmd->uuid, down_cmd->method,down_cmd->param);
-	set_device_state(1);
-    // app ÊÇµÈ·µ»Ø»¹ÊÇÖ±½Ó»ñÈ¡·þÎñ¶ËÊý¾Ý?
-    // Òì²½
-	return 0;
-	/*do your job end */
+    /* do your job here */
+    printf("%s %d \n", __FUNCTION__, __LINE__);
+    printf("%s %d\n%s\n", down_cmd->uuid, down_cmd->method, down_cmd->param);
+    set_device_state(1);
+    // app æ˜¯ç­‰è¿”å›žè¿˜æ˜¯ç›´æŽ¥èŽ·å–æœåŠ¡ç«¯æ•°æ®?
+    // å¼‚æ­¥
+    return 0;
+    /*do your job end */
+}
+
+
+static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
+{
+    char uuid[33] = { 0 };
+    char *mac = (char *)dev_mac;
+    enum ALINK_STATUS *state = (enum ALINK_STATUS *)sys_state;
+    switch (*state) {
+    case ALINK_STATUS_INITED:
+        break;
+    case ALINK_STATUS_REGISTERED:
+        sprintf(uuid, "%s", alink_get_uuid(NULL));
+        printf("ALINK_STATUS_REGISTERED, mac %s uuid %s \n", mac,
+               uuid);
+        break;
+    case ALINK_STATUS_LOGGED:
+        sprintf(uuid, "%s", alink_get_uuid(NULL));
+        printf("ALINK_STATUS_LOGGED, mac %s uuid %s\n", mac, uuid);
+        break;
+    default:
+        break;
+    }
+    return 0;
 }
 
 
 
-
-
-int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
-{
-	char uuid[33] = { 0 };
-	char *mac = (char *)dev_mac;
-	enum ALINK_STATUS *state = (enum ALINK_STATUS *)sys_state;
-	switch (*state) {
-	case ALINK_STATUS_INITED:
-		break;
-	case ALINK_STATUS_REGISTERED:
-		sprintf(uuid, "%s", alink_get_uuid(NULL));
-		printf("ALINK_STATUS_REGISTERED, mac %s uuid %s \n", mac,
-			uuid);
-		break;
-	case ALINK_STATUS_LOGGED:
-		sprintf(uuid, "%s", alink_get_uuid(NULL));
-		printf("ALINK_STATUS_LOGGED, mac %s uuid %s\n", mac, uuid);
-		break;
-	default:
-		break;
-	}
-	return 0;
+static void alink_fill_deviceinfo(struct device_info *deviceinfo)
+{   /*fill main device info here */
+    product_get_name(deviceinfo->name);
+    product_get_sn(deviceinfo->sn);  // äº§å“æ³¨å†Œæ–¹å¼ å¦‚æžœæ˜¯sn, é‚£ä¹ˆéœ€è¦ä¿éšœsnå”¯ä¸€
+    product_get_key(deviceinfo->key);
+    product_get_model(deviceinfo->model);
+    product_get_secret(deviceinfo->secret);
+    product_get_type(deviceinfo->type);
+    product_get_version(deviceinfo->version);
+    product_get_category(deviceinfo->category);
+    product_get_manufacturer(deviceinfo->manufacturer);
+    product_get_debug_key(deviceinfo->key_sandbox);
+    product_get_debug_secret(deviceinfo->secret_sandbox);
+    platform_wifi_get_mac(deviceinfo->mac);//äº§å“æ³¨å†Œmacå”¯ä¸€ or snå”¯ä¸€  ç»Ÿä¸€å¤§å†™
+    product_get_cid(deviceinfo->cid); // ä½¿ç”¨æŽ¥å£èŽ·å–å”¯ä¸€chipid,é˜²ä¼ªé€ è®¾å¤‡
+    printf("DEV_MODEL:%s \n", deviceinfo->model);
 }
 
-
-
-void alink_fill_deviceinfo(struct device_info *deviceinfo)
-{				/*fill main device info here */
-	product_get_name(deviceinfo->name);
-	product_get_sn(deviceinfo->sn);  // ²úÆ·×¢²á·½Ê½ Èç¹ûÊÇsn, ÄÇÃ´ÐèÒª±£ÕÏsnÎ¨Ò»
-	product_get_key(deviceinfo->key);
-	product_get_model(deviceinfo->model);
-	product_get_secret(deviceinfo->secret);
-	product_get_type(deviceinfo->type);
-	product_get_version(deviceinfo->version);
-	product_get_category(deviceinfo->category);
-	product_get_manufacturer(deviceinfo->manufacturer);
-	product_get_debug_key(deviceinfo->key_sandbox);
-	product_get_debug_secret(deviceinfo->secret_sandbox);
-	platform_wifi_get_mac(deviceinfo->mac);//²úÆ·×¢²ámacÎ¨Ò» or snÎ¨Ò»  Í³Ò»´óÐ´
-	product_get_cid(deviceinfo->cid); // Ê¹ÓÃ½Ó¿Ú»ñÈ¡Î¨Ò»chipid,·ÀÎ±ÔìÉè±¸
-	printf("DEV_MODEL:%s \n", deviceinfo->model);
-}
-
-int main(int argc, char **argv)
+void alink_json(void *arg)
 {
-
-	struct device_info *main_dev; 
+    struct device_info *main_dev;
     main_dev = platform_malloc(sizeof(struct device_info));
     alink_sample_mutex = platform_mutex_init();
-	memset(main_dev, 0, sizeof(struct device_info));
-	alink_fill_deviceinfo(main_dev);	
-	alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
-			   ALINK_LL_ERROR | ALINK_LL_DUMP);
-	main_dev->sys_callback[ALINK_FUNC_SERVER_STATUS] = alink_handler_systemstates_callback;
+    memset(main_dev, 0, sizeof(struct device_info));
+    alink_fill_deviceinfo(main_dev);
+    // alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
+    //                    ALINK_LL_ERROR | ALINK_LL_DUMP);
+    alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_ERROR | ALINK_LL_DUMP);
+    main_dev->sys_callback[ALINK_FUNC_SERVER_STATUS] = alink_handler_systemstates_callback;
 
 
-	/*start alink-sdk */
+    /*start alink-sdk */
 
-	main_dev->dev_callback[ACB_GET_DEVICE_STATUS] = main_dev_get_device_status_callback;
-	main_dev->dev_callback[ACB_SET_DEVICE_STATUS] = main_dev_set_device_status_callback;
-	alink_start(main_dev);	/*register main device here */
+    main_dev->dev_callback[ACB_GET_DEVICE_STATUS] = main_dev_get_device_status_callback;
+    main_dev->dev_callback[ACB_SET_DEVICE_STATUS] = main_dev_set_device_status_callback;
+    alink_start(main_dev);  /*register main device here */
 
     platform_free(main_dev);
 
     printf("wait main device login");
-	/*wait main device login, -1 means wait forever */
-	alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
+    /*wait main device login, -1 means wait forever */
+    alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
 
-	while (sample_running) {
+    while (sample_running) {
+        alink_device_post_data(NULL);
+        platform_msleep(500);
+    }
 
-		alink_device_post_data(NULL);
-		platform_msleep(500);
-	}
-
-	alink_end();
-	platform_mutex_destroy(alink_sample_mutex);
+    alink_end();
+    platform_mutex_destroy(alink_sample_mutex);
+    vTaskDelete(NULL);
 }
 
