@@ -223,9 +223,9 @@ void alink_json(void *arg)
     alink_sample_mutex = platform_mutex_init();
     memset(main_dev, 0, sizeof(struct device_info));
     alink_fill_deviceinfo(main_dev);
-    // alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
-    //                    ALINK_LL_ERROR | ALINK_LL_DUMP);
-    alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_ERROR | ALINK_LL_DUMP);
+    alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
+                       ALINK_LL_ERROR | ALINK_LL_DUMP);
+    // alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_ERROR | ALINK_LL_DUMP);
     main_dev->sys_callback[ALINK_FUNC_SERVER_STATUS] = alink_handler_systemstates_callback;
 
 

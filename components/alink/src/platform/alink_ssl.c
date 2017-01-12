@@ -51,6 +51,7 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
 int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
 {
     // require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
+    require_action_exit(length == 0, "[%s, %d]:Parameter error length == 0", __func__, __LINE__);
     if (ssl == NULL) {
         ESP_LOGE(TAG, "[%s, %d]:Parameter error ssl: %p", __func__, __LINE__, ssl);
         return -1;

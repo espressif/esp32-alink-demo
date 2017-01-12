@@ -40,6 +40,7 @@ static void free_heap_task(void *arg)
 *******************************************************************************/
 void app_main()
 {
+    ets_printf("==== esp32_alink sdk version: 1.0.5  ====\n");
     ets_printf("free_heap :%u\n", esp_get_free_heap_size());
     nvs_flash_init();
     tcpip_adapter_init();

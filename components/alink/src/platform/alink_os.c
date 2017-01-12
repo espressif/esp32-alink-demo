@@ -216,7 +216,6 @@ int platform_thread_create(_OUT_ void **thread,
         return 0;
     }
     ESP_LOGE(TAG, "[%s, %d]:xTaskCreate", __func__, __LINE__);
-
     return -1;
 }
 
@@ -232,14 +231,14 @@ int platform_config_read(_OUT_ char *buffer, _IN_ int length)
 {
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
 
-    // printf("---------- platform_config_read: %02x %02x %02x length: %d -------------\n",
-    //        buffer[0], buffer[1], buffer[2], length);
     esp_err_t ret     = -1;
     nvs_handle config_handle = 0;
 
-    ret = nvs_open("alink", NVS_READWRITE, &config_handle);
+    ret = nvs_open("ALINK", NVS_READWRITE, &config_handle);
     if (ret != 0) return -1;
-    ret = nvs_get_blob(config_handle, "config", buffer, (size_t *)&length);
+    ret = nvs_get_blob(config_handle, "os_config", buffer, (size_t *)&length);
+    ESP_LOGI(TAG, "---------- platform_config_read: %02x %02x %02x length: %d -------------\n",
+           buffer[0], buffer[1], buffer[2], length);
     if (ret != 0) return -1;
     nvs_close(config_handle);
     return 0;
@@ -248,17 +247,17 @@ int platform_config_read(_OUT_ char *buffer, _IN_ int length)
 int platform_config_write(_IN_ const char *buffer, _IN_ int length)
 {
     require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
-    // printf("---------- platform_config_write: %02x %02x %02x length: %d -------------\n",
-    //        buffer[0], buffer[1], buffer[2], length);
+    ESP_LOGI(TAG, "---------- platform_config_write: %02x %02x %02x length: %d -------------\n",
+           buffer[0], buffer[1], buffer[2], length);
 
     if (!buffer || length <= 0)
         return -1;
 
     esp_err_t ret     = -1;
     nvs_handle config_handle = 0;
-    ret = nvs_open("alink", NVS_READWRITE, &config_handle);
+    ret = nvs_open("ALINK", NVS_READWRITE, &config_handle);
     if (ret != 0) return -1;
-    ret = nvs_set_blob(config_handle, "config", buffer, length);
+    ret = nvs_set_blob(config_handle, "os_config", buffer, length);
     if (ret != 0) return -1;
     nvs_commit(config_handle);
     nvs_close(config_handle);

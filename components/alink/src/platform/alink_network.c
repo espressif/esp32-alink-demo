@@ -27,17 +27,9 @@ static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct 
     struct hostent *hp;
     uint32_t ip;
 
-    // printf("free heap_size: %d\n", uxTaskGetStackHighWaterMark(NULL));
-
     if (NULL == netaddr->host) {
         ip = htonl(INADDR_ANY);
     } else {
-        // if (NULL == (hp = gethostbyname(netaddr->host))){
-        //     printf("can't resolute the host address \n");
-        //     return -1;
-        // }
-        // ip = *((uint32_t *)hp->h_addr);
-
         printf("netaddr->host:%s\n", netaddr->host);
         hp = gethostbyname(netaddr->host);
         if (!hp) {
@@ -56,11 +48,13 @@ static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct 
 
     memset(paddr, 0, sizeof(struct sockaddr_in));
 
-    // int opt_val = 1;
-    // if (0 != setsockopt(*psock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val))){
-    //     close((int)*psock);
-    //     return -1;
-    // }
+    int opt_val = 1;
+    if (0 != setsockopt(*psock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val))) {
+        // close((int)*psock);
+        ESP_LOGW(TAG, "[%s, %d]:setsockopt SO_REUSEADDR", __func__, __LINE__);
+        perror("setsockopt:");
+        // return -1;
+    }
 
     printf("ip:%d\n", ip);
     paddr->sin_addr.s_addr = ip;
@@ -83,6 +77,7 @@ void *platform_udp_server_create(_IN_ uint16_t port)
     if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in))) {
         platform_udp_close((void *)server_socket);
         ESP_LOGE(TAG, "[%s, %d]:socket bind", __func__, __LINE__);
+        perror("socket bind");
         return NULL;
     }
 
@@ -97,6 +92,7 @@ void *platform_udp_client_create(void)
 
     if (0 != network_create_socket(&netaddr, SOCK_DGRAM, &addr, &sock)) {
         ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
+        perror("create socket");
         return NULL;
     }
 
@@ -121,15 +117,9 @@ void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
         return NULL;
     }
 
-    /* allow multiple sockets to use the same PORT number */
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&option, sizeof(option)) < 0) {
-        ESP_LOGE(TAG, "[%s, %d]:setsockopt Reusing ADDR", __func__, __LINE__);
-        platform_udp_close((void *)sock);
-        return NULL;
-    }
-
     if (-1 == bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
         ESP_LOGE(TAG, "[%s, %d]:socket bind", __func__, __LINE__);
+        perror("socket bind");
         platform_udp_close((void *)sock);
         return NULL;
     }
@@ -141,7 +131,6 @@ void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
         platform_udp_close((void *)sock);
         return NULL;
     }
-
     return (void *)sock;
 }
 
@@ -212,7 +201,6 @@ int platform_udp_recvfrom(
 
     return -1;
 }
-
 
 
 void *platform_tcp_server_create(_IN_ uint16_t port)

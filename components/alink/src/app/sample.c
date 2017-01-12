@@ -1,4 +1,4 @@
-#if 0
+#if 1
 /*
  * Copyright (c) 2014-2015 Alibaba Group. All rights reserved.
  *
@@ -57,7 +57,7 @@ const char *main_dev_params =
 static char device_status_change = 1;
 
 
-int get_device_state()
+static int get_device_state()
 {
 	int ret = 0;
 	platform_mutex_lock(alink_sample_mutex);
@@ -66,7 +66,7 @@ int get_device_state()
 	return ret;
 }
 
-int set_device_state(int state)
+static int set_device_state(int state)
 {
 	platform_mutex_lock(alink_sample_mutex);
 	device_status_change = state;
@@ -138,7 +138,7 @@ static int get_device_status(char *rawdata, int len)
 	/* do your job end */
 	return ret;
 }
-int alink_device_post_raw_data(void)
+static int alink_device_post_raw_data(void)
 {
 	/* do your job here */
 	int len = 8, ret = 0;
@@ -156,7 +156,7 @@ int alink_device_post_raw_data(void)
 	/* do your job end */
 	return ret;
 }
-int rawdata_get_callback(const char *in_rawdata, int in_len, char *out_rawdata, int *out_len)
+static int rawdata_get_callback(const char *in_rawdata, int in_len, char *out_rawdata, int *out_len)
 {
 	int ret = 0;
 	set_device_state(1);
@@ -164,7 +164,7 @@ int rawdata_get_callback(const char *in_rawdata, int in_len, char *out_rawdata, 
 	return ret;
 }
 
-int rawdata_set_callback(char *rawdata, int len)
+static int rawdata_set_callback(char *rawdata, int len)
 {
 	/* TODO: */
 	/*get cmd from server, do your job here! */
@@ -177,7 +177,7 @@ int rawdata_set_callback(char *rawdata, int len)
 
 
 
-int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
+static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
 {
 	char uuid[33] = { 0 };
 	char *mac = (char *)dev_mac;
@@ -202,7 +202,7 @@ int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
 
 
 
-void alink_fill_deviceinfo(struct device_info *deviceinfo)
+static void alink_fill_deviceinfo(struct device_info *deviceinfo)
 {	/*fill main device info here */
 	product_get_name(deviceinfo->name);
 	product_get_sn(deviceinfo->sn);  // ²úÆ·×¢²á·½Ê½ Èç¹ûÊÇsn, ÄÇÃ´ÐèÒª±£ÕÏsnÎ¨Ò»
@@ -242,14 +242,9 @@ void alink_passthroug(void *arg)
 	alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
 
 	while (sample_running) {
-
 		alink_device_post_raw_data();
-		// int count = pxCurrentTCB[ xPortGetCoreID() ]->uxCriticalNesting;
-		// printf("uxCriticalNesting: %d ")
-		// platform_msleep(1000);
 		vTaskDelay(500/portTICK_RATE_MS);
 	}
-	printf("=========== alink end ================");
 	alink_end();
 	platform_mutex_destroy(alink_sample_mutex);
 	vTaskDelete(NULL);

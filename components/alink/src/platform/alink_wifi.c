@@ -129,11 +129,10 @@ char *platform_wifi_get_mac(_OUT_ char mac_str[PLATFORM_MAC_LEN])
 
 uint32_t platform_wifi_get_ip(_OUT_ char ip_str[PLATFORM_IP_LEN])
 {
-    ets_printf("== [%s, %d] ==\n", __func__, __LINE__);
+    require_action_exit(ip_str == NULL, "[%s, %d]:Parameter error ip_str == NULL", __func__, __LINE__);
     tcpip_adapter_ip_info_t infor;
     tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &infor);
     memcpy(ip_str, inet_ntoa(infor.ip.addr), PLATFORM_IP_LEN);
-    ets_printf("== [%s, %d] ==\n", __func__, __LINE__);
     return infor.ip.addr;
 }
 
