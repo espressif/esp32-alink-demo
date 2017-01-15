@@ -11,35 +11,31 @@
 
 #include "platform/platform.h"
 #include "tcpip_adapter.h"
+#include "alink_user_config.h"
 
 #define SOMAXCONN 5
-
 static const char *TAG = "alink_network";
-#define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
-#define require_action_NULL(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); return NULL;}
 
-static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct sockaddr_in *paddr, int *psock)
+static alink_err_t network_create_socket( pplatform_netaddr_t netaddr, int type, struct sockaddr_in *paddr, int *psock)
 {
-    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
-    require_action_exit(paddr == NULL, "[%s, %d]:Parameter error paddr == NULL", __func__, __LINE__);
-    require_action_exit(psock == NULL, "[%s, %d]:Parameter error psock == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(netaddr == NULL);
+    ALINK_PARAM_CHECK(paddr == NULL);
+    ALINK_PARAM_CHECK(psock == NULL);
 
     struct hostent *hp;
     uint32_t ip;
+    alink_err_t ret;
 
     if (NULL == netaddr->host) {
         ip = htonl(INADDR_ANY);
     } else {
-        printf("netaddr->host:%s\n", netaddr->host);
         hp = gethostbyname(netaddr->host);
-        if (!hp) {
-            ESP_LOGE(TAG, "can't resolute the host address");
-            return -1;
-        }
+        ALINK_ERROR_CHECK(hp == NULL, ALINK_SOCKET_ERR, "gethostbyname ret:%p", hp);
+
         struct ip4_addr *ip4_addr = (struct ip4_addr *)hp->h_addr;
         char ipaddr_tmp[64] = {0};
         sprintf(ipaddr_tmp, IPSTR, IP2STR(ip4_addr));
-        printf("ip: %s\n", ipaddr_tmp);
+        ALINK_LOGI("alink server ip: %s\n", ipaddr_tmp);
         ip = inet_addr(ipaddr_tmp);
     }
 
@@ -49,38 +45,32 @@ static int network_create_socket( pplatform_netaddr_t netaddr, int type, struct 
     memset(paddr, 0, sizeof(struct sockaddr_in));
 
     int opt_val = 1;
-    if (0 != setsockopt(*psock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val))) {
-        // close((int)*psock);
-        ESP_LOGW(TAG, "[%s, %d]:setsockopt SO_REUSEADDR", __func__, __LINE__);
-        perror("setsockopt:");
-        // return -1;
-    }
+    ret = setsockopt(*psock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val));
+    ALINK_ERROR_CHECK(ret != 0, ALINK_SOCKET_ERR, "setsockopt SO_REUSEADDR errno: %d", errno);
 
-    printf("ip:%d\n", ip);
     paddr->sin_addr.s_addr = ip;
     paddr->sin_family = AF_INET;
     paddr->sin_port = htons( netaddr->port );
-    return 0;
+    return ALINK_OK;
 }
 
 void *platform_udp_server_create(_IN_ uint16_t port)
 {
     struct sockaddr_in addr;
     int server_socket;
+    alink_err_t ret;
     platform_netaddr_t netaddr = {NULL, port};
 
-    if (0 != network_create_socket(&netaddr, SOCK_DGRAM, &addr, &server_socket)) {
-        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
-        return NULL;
-    }
+    ret = network_create_socket(&netaddr, SOCK_DGRAM, &addr, &server_socket);
+    ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
+    ret = bind(server_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
     if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in))) {
         platform_udp_close((void *)server_socket);
-        ESP_LOGE(TAG, "[%s, %d]:socket bind", __func__, __LINE__);
+        ALINK_LOGE("[%s, %d]:socket bind", __func__, __LINE__);
         perror("socket bind");
         return NULL;
     }
-
     return (void *)server_socket;
 }
 
@@ -89,36 +79,32 @@ void *platform_udp_client_create(void)
     struct sockaddr_in addr;
     int sock;
     platform_netaddr_t netaddr = {NULL, 0};
+    alink_err_t ret;
 
-    if (0 != network_create_socket(&netaddr, SOCK_DGRAM, &addr, &sock)) {
-        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
-        perror("create socket");
-        return NULL;
-    }
+    ret = network_create_socket(&netaddr, SOCK_DGRAM, &addr, &sock);
+    ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     return (void *)sock;
 }
 
 void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
 {
-    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
-    int option = 1;
+    ALINK_PARAM_CHECK(netaddr == NULL);
     struct sockaddr_in addr;
     int sock;
     struct ip_mreq mreq;
+    alink_err_t ret = 0;
 
     platform_netaddr_t netaddr_client = {NULL, netaddr->port};
 
     memset(&addr, 0, sizeof(addr));
     memset(&mreq, 0, sizeof(mreq));
 
-    if (0 != network_create_socket(&netaddr_client, SOCK_DGRAM, &addr, &sock)) {
-        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
-        return NULL;
-    }
+    ret = network_create_socket(&netaddr_client, SOCK_DGRAM, &addr, &sock);
+    ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     if (-1 == bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
-        ESP_LOGE(TAG, "[%s, %d]:socket bind", __func__, __LINE__);
+        ALINK_LOGE("[%s, %d]:socket bind, errno: %d", __func__, __LINE__, errno);
         perror("socket bind");
         platform_udp_close((void *)sock);
         return NULL;
@@ -127,7 +113,7 @@ void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
     mreq.imr_multiaddr.s_addr = inet_addr(netaddr->host);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &mreq, sizeof(mreq)) < 0) {
-        ESP_LOGE(TAG, "[%s, %d]:setsockopt IP_ADD_MEMBERSHIP", __func__, __LINE__);
+        ALINK_LOGE("[%s, %d]:setsockopt IP_ADD_MEMBERSHIP", __func__, __LINE__);
         platform_udp_close((void *)sock);
         return NULL;
     }
@@ -146,18 +132,16 @@ int platform_udp_sendto(
     _IN_ uint32_t length,
     _IN_ pplatform_netaddr_t netaddr)
 {
-    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
-    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
-    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK((int)handle < 0);
+    ALINK_PARAM_CHECK(buffer == NULL);
+    ALINK_PARAM_CHECK(netaddr == NULL);
     int ret_code;
     struct hostent *hp;
     struct sockaddr_in addr;
 
-    if (NULL == (hp = gethostbyname(netaddr->host))) {
-        ESP_LOGE(TAG, "[%s, %d]:gethostbyname", __func__, __LINE__);
-        printf("Can't resolute the host address \n");
-        return -1;
-    }
+    hp = gethostbyname(netaddr->host);
+    ALINK_ERROR_CHECK(hp == NULL, ALINK_ERR, "gethostbyname Can't resolute the host address hp:%p", hp);
+
 
     addr.sin_addr.s_addr = *((u_int *)(hp->h_addr));
     //addr.sin_addr.S_un.S_addr = *((u_int *)(hp->h_addr));
@@ -170,8 +154,8 @@ int platform_udp_sendto(
                       0,
                       (struct sockaddr *)&addr,
                       sizeof(struct sockaddr_in));
-
-    return (ret_code) > 0 ? ret_code : -1;
+    ALINK_ERROR_CHECK(ret_code <= 0, ALINK_ERR, "sendto ret:%d, errno:%d", ret_code, errno);
+    return ret_code;
 }
 
 
@@ -181,25 +165,23 @@ int platform_udp_recvfrom(
     _IN_ uint32_t length,
     _OUT_OPT_ pplatform_netaddr_t netaddr)
 {
-    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
-    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
-    // require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK((int)handle < 0);
+    ALINK_PARAM_CHECK(buffer == NULL);
+    // ALINK_PARAM_CHECK(netaddr == NULL);
     int ret_code;
     struct sockaddr_in addr;
     unsigned int addr_len = sizeof(addr);
 
     ret_code = recvfrom((int)handle, buffer, length, 0, (struct sockaddr *)&addr, &addr_len);
-    if (ret_code > 0) {
-        if (NULL != netaddr) {
-            netaddr->port = ntohs(addr.sin_port);
-            if (NULL != netaddr->host) {
-                strcpy(netaddr->host, inet_ntoa(addr.sin_addr));
-            }
-        }
-        return ret_code;
-    }
+    ALINK_ERROR_CHECK(ret_code <= 0, ALINK_ERR, "recvfrom ret:%d, errno:%d", ret_code, errno);
 
-    return -1;
+    if (NULL != netaddr) {
+        netaddr->port = ntohs(addr.sin_port);
+        if (NULL != netaddr->host) {
+            strcpy(netaddr->host, inet_ntoa(addr.sin_addr));
+        }
+    }
+    return ret_code;
 }
 
 
@@ -207,90 +189,81 @@ void *platform_tcp_server_create(_IN_ uint16_t port)
 {
     struct sockaddr_in addr;
     int server_socket;
+    alink_err_t ret = 0;
     platform_netaddr_t netaddr = {NULL, port};
 
-    if (0 != network_create_socket(&netaddr, SOCK_STREAM, &addr, &server_socket)) {
-        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
-        return NULL;
-    }
+    ret = network_create_socket(&netaddr, SOCK_DGRAM, &addr, &server_socket);
+    ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(addr))) {
-        ESP_LOGE(TAG, "[%s, %d]:bind", __func__, __LINE__);
+        ALINK_LOGE("[%s, %d]:bind", __func__, __LINE__);
         platform_tcp_close((void *)server_socket);
         return NULL;
     }
 
     if (0 != listen(server_socket, SOMAXCONN)) {
-        ESP_LOGE(TAG, "[%s, %d]:listen", __func__, __LINE__);
+        ALINK_LOGE("[%s, %d]:listen", __func__, __LINE__);
         platform_tcp_close((void *)server_socket);
         return NULL;
     }
-
     return (void *)server_socket;
 }
 
 
 void *platform_tcp_server_accept(_IN_ void *server)
 {
-    require_action_exit(server == NULL, "[%s, %d]:Parameter error server == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(server == NULL);
     struct sockaddr_in addr;
     unsigned int addr_length = sizeof(addr);
     int new_client;
 
-    if ((new_client = accept((int)server, (struct sockaddr*)&addr, &addr_length)) <= 0) {
-        ESP_LOGE(TAG, "[%s, %d]:accept", __func__, __LINE__);
-        return NULL;
-    }
+    new_client = accept((int)server, (struct sockaddr*)&addr, &addr_length);
+    ALINK_ERROR_CHECK(new_client <= 0, NULL, "accept errno:%d", errno);
 
     return (void *)new_client;
 }
 
 
-
-
 void *platform_tcp_client_connect(_IN_ pplatform_netaddr_t netaddr)
 {
-    require_action_exit(netaddr == NULL, "[%s, %d]:Parameter error netaddr == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(netaddr == NULL);
     struct sockaddr_in addr;
     int sock;
+    alink_err_t ret = 0;
 
-    if (0 != network_create_socket(netaddr, SOCK_STREAM, &addr, &sock)) {
-        ESP_LOGE(TAG, "[%s, %d]:create socket", __func__, __LINE__);
-        return NULL;
-    }
+    ret = network_create_socket(netaddr, SOCK_STREAM, &addr, &sock);
+    ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     if (-1 == connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
-        ESP_LOGE(TAG, "[%s, %d]:connect", __func__, __LINE__);
+        ALINK_LOGE("[%s, %d]:connect", __func__, __LINE__);
         platform_tcp_close((void *)sock);
         return NULL;
     }
-
     return (void *)sock;
 }
 
 
-
 int platform_tcp_send(_IN_ void *handle, _IN_ const char *buffer, _IN_ uint32_t length)
 {
-    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
-    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK((int)handle < 0);
+    ALINK_PARAM_CHECK(buffer == NULL);
     int bytes_sent;
 
     bytes_sent = send((int)handle, buffer, length, 0);
-    return bytes_sent > 0 ? bytes_sent : -1;
+    ALINK_ERROR_CHECK(bytes_sent <= 0, ALINK_ERR, "send ret:%d", bytes_sent);
+    return bytes_sent;
 }
-
 
 
 int platform_tcp_recv(_IN_ void *handle, _OUT_ char *buffer, _IN_ uint32_t length)
 {
-    require_action_exit((int)handle < 0, "[%s, %d]:Parameter error handle < 0", __func__, __LINE__);
-    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK((int)handle < 0);
+    ALINK_PARAM_CHECK(buffer == NULL);
     int bytes_received;
 
     bytes_received = recv((int)handle, buffer, length, 0);
-
-    return bytes_received > 0 ? bytes_received : -1;
+    ALINK_ERROR_CHECK(bytes_received <= 0, ALINK_ERR, "recv ret:%d", bytes_received);
+    return bytes_received;
 }
 
 
@@ -305,8 +278,8 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
                     void *write_fds[PLATFORM_SOCKET_MAXNUMS],
                     int timeout_ms)
 {
-    require_action_exit(read_fds == NULL, "[%s, %d]:Parameter error read_fds == NULL", __func__, __LINE__);
-    // require_action_exit(write_fds == NULL, "[%s, %d]:Parameter error write_fds == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(read_fds == NULL);
+    // ALINK_PARAM_CHECK(write_fds == NULL);
     int i, ret_code = -1;
     struct timeval timeout_value;
     struct timeval *ptimeval = &timeout_value;
@@ -324,7 +297,7 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     if (NULL != read_fds) {
         pfd_read_set = malloc(sizeof(fd_set));
         if (NULL == pfd_read_set) {
-            ESP_LOGE(TAG, "[%s, %d]:pfd_read_set", __func__, __LINE__);
+            ALINK_LOGE("[%s, %d]:pfd_read_set", __func__, __LINE__);
             goto do_exit;
         }
 
@@ -343,7 +316,7 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     {
         pfd_write_set = malloc(sizeof(fd_set));
         if (NULL == pfd_write_set) {
-            ESP_LOGE(TAG, "[%s, %d]:pfd_write_set", __func__, __LINE__);
+            ALINK_LOGE("[%s, %d]:pfd_write_set", __func__, __LINE__);
             goto do_exit;
         }
 
@@ -381,5 +354,9 @@ do_exit:
     if (pfd_read_set) free(pfd_read_set);
     if (pfd_write_set) free(pfd_write_set);
 
-    return (ret_code >= 0) ? ret_code : -1;
+    if (ret_code < 0) {
+        ALINK_LOGW("select ret:%d, errno: %d", ret_code, errno);
+        perror("socket select");
+    }
+    return ret_code;
 }

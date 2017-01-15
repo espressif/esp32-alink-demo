@@ -11,14 +11,15 @@
 #include "string.h"
 #include "platform.h"
 #include "product.h"
+#include "alink_user_config.h"
+static const char *TAG = "alink_smartconfig";
 
-BaseType_t aws_smartconfig_init(wifi_config_t *wifi_config)
+alink_err_t aws_smartconfig_init(_OUT_ wifi_config_t *wifi_config)
 {
     char bssid[6];
     char auth;
     char encry;
     char channel;
-    BaseType_t ret;
 
     char product_model[PRODUCT_MODEL_LEN];
     char product_secret[PRODUCT_SECRET_LEN];
@@ -29,10 +30,10 @@ BaseType_t aws_smartconfig_init(wifi_config_t *wifi_config)
     platform_wifi_get_mac(device_mac);
 
     aws_start(product_model, product_secret, device_mac, NULL);
-    ret = aws_get_ssid_passwd((char *)wifi_config->sta.ssid, (char *)wifi_config->sta.password,
+    alink_err_t ret = aws_get_ssid_passwd((char *)wifi_config->sta.ssid, (char *)wifi_config->sta.password,
                               &bssid[0], &auth, &encry, &channel);
-    if (ret == pdFALSE) {
-        printf("alink wireless setup timeout!\n");
-    }
-    return ret;
+
+    ALINK_ERROR_CHECK(ret != pdTRUE, ALINK_ERR, "alink wireless setup timeout, ret:%x", ret);
+
+    return ALINK_OK;
 }

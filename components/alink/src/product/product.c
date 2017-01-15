@@ -57,67 +57,65 @@
 #define DEV_MANUFACTURE "ALINKTEST"
 
 
-
 char *product_get_name(char name_str[PRODUCT_NAME_LEN])
 {
-    return strncpy(name_str, product_dev_name, PRODUCT_NAME_LEN);
+    return memcpy(name_str, product_dev_name, PRODUCT_NAME_LEN);
 }
-
 
 char *product_get_version(char ver_str[PRODUCT_VERSION_LEN])
 {
-    return strncpy(ver_str, product_dev_version, PRODUCT_VERSION_LEN);
+    return memcpy(ver_str, product_dev_version, PRODUCT_VERSION_LEN);
 }
 
 char *product_get_model(char model_str[PRODUCT_MODEL_LEN])
 {
-    return strncpy(model_str, product_model, PRODUCT_MODEL_LEN);
+    return memcpy(model_str, product_model, PRODUCT_MODEL_LEN);
 }
 
 char *product_get_key(char key_str[PRODUCT_KEY_LEN])
 {
-    return strncpy(key_str, product_key, PRODUCT_KEY_LEN);
+    return memcpy(key_str, product_key, PRODUCT_KEY_LEN);
 }
 
 char *product_get_secret(char secret_str[PRODUCT_SECRET_LEN])
 {
-    return strncpy(secret_str, product_secret, PRODUCT_SECRET_LEN);
+    return memcpy(secret_str, product_secret, PRODUCT_SECRET_LEN);
 }
 
 char *product_get_debug_key(char key_str[PRODUCT_KEY_LEN])
 {
-    return strncpy(key_str, product_debug_key, PRODUCT_KEY_LEN);
+    return memcpy(key_str, product_debug_key, PRODUCT_KEY_LEN);
 }
 
 char *product_get_debug_secret(char secret_str[PRODUCT_SECRET_LEN])
 {
-    return strncpy(secret_str, product_debug_secret, PRODUCT_SECRET_LEN);
+    return memcpy(secret_str, product_debug_secret, PRODUCT_SECRET_LEN);
 }
 
 char *product_get_sn(char sn_str[PRODUCT_SN_LEN])
 {
-    return strncpy(sn_str, product_dev_sn, PRODUCT_SN_LEN);
+    return memcpy(sn_str, product_dev_sn, PRODUCT_SN_LEN);
 }
 
 
 char *product_get_type(char type_str[STR_NAME_LEN])
 {
-    return strncpy(type_str, product_dev_type, STR_NAME_LEN);
+    return memcpy(type_str, product_dev_type, STR_NAME_LEN);
 }
 
 char *product_get_category(char category_str[STR_NAME_LEN])
 {
-    return strncpy(category_str, product_dev_category, STR_NAME_LEN);
+    return memcpy(category_str, product_dev_category, STR_NAME_LEN);
 }
 
 char *product_get_manufacturer(char manufacturer_str[STR_NAME_LEN])
 {
-    return strncpy(manufacturer_str, product_dev_manufacturer, STR_NAME_LEN);
+    return memcpy(manufacturer_str, product_dev_manufacturer, STR_NAME_LEN);
 }
 
 char *product_get_cid(char cid_str[STR_CID_LEN])
 {
-	return strncpy(cid_str, product_dev_cid, STR_CID_LEN);
+	return memcpy(cid_str, product_dev_cid, STR_CID_LEN);
 }
 
 

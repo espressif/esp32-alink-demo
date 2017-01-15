@@ -24,6 +24,9 @@
  * INCLUDING THE WARRANTIES OF MERCHANTIBILITY, FITNESS FOR A PARTICULAR
  * PURPOSE, TITLE, AND NONINFRINGEMENT.
  */
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -32,10 +35,9 @@
 #include "platform/platform.h"
 #include "product/product.h"
 #include "alink_export.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include "alink_user_config.h"
 
+static const char *TAG = "alink_json";
 void *alink_sample_mutex;
 /*do your job here*/
 struct virtual_dev {
@@ -49,8 +51,8 @@ struct virtual_dev {
 };
 
 static char *device_attr[5] = { "OnOff_Power", "Color_Temperature", "Light_Brightness",
-                         "TimeDelay_PowerOff", "WorkMode_MasterLight"
-                       };
+                                "TimeDelay_PowerOff", "WorkMode_MasterLight"
+                              };
 
 const char *main_dev_params =
     "{\"OnOff_Power\": { \"value\": \"%d\" }, \"Color_Temperature\": { \"value\": \"%d\" }, \"Light_Brightness\": { \"value\": \"%d\" }, \"TimeDelay_PowerOff\": { \"value\": \"%d\"}, \"WorkMode_MasterLight\": { \"value\": \"%d\"}}";
@@ -100,10 +102,10 @@ static int alink_device_post_data(alink_down_cmd_ptr down_cmd)
         }
         ret = alink_post_device_data(&up_cmd);
         if (ret == ALINK_ERR) {
-            printf("post failed!\n");
+            ALINK_LOGI("post failed!");
             platform_msleep(2000);
         } else {
-            printf("dev post data success!\n");
+            ALINK_LOGI("dev post data success!");
             device_status_change = 0;
         }
         if (buffer)
@@ -121,8 +123,8 @@ static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
     char *valueStr = NULL, *attrStr = NULL;
 
     /* do your job here */
-    printf("%s %d \n", __FUNCTION__, __LINE__);
-    printf("%s %d\n%s\n", down_cmd->uuid, down_cmd->method, down_cmd->param);
+    ALINK_LOGI("%s %d ", __FUNCTION__, __LINE__);
+    ALINK_LOGI("%s %d\n%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
     set_device_state(1);
 
     for (i = 0; i < 5; i++) {
@@ -163,8 +165,8 @@ static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
 static int main_dev_get_device_status_callback(alink_down_cmd_ptr down_cmd)
 {
     /* do your job here */
-    printf("%s %d \n", __FUNCTION__, __LINE__);
-    printf("%s %d\n%s\n", down_cmd->uuid, down_cmd->method, down_cmd->param);
+    ALINK_LOGI("%s %d ", __FUNCTION__, __LINE__);
+    ALINK_LOGI("%s %d\n%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
     set_device_state(1);
     // app 是等返回还是直接获取服务端数据?
     // 异步
@@ -183,12 +185,12 @@ static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
         break;
     case ALINK_STATUS_REGISTERED:
         sprintf(uuid, "%s", alink_get_uuid(NULL));
-        printf("ALINK_STATUS_REGISTERED, mac %s uuid %s \n", mac,
-               uuid);
+        ALINK_LOGI("ALINK_STATUS_REGISTERED, mac %s uuid %s ", mac,
+                 uuid);
         break;
     case ALINK_STATUS_LOGGED:
         sprintf(uuid, "%s", alink_get_uuid(NULL));
-        printf("ALINK_STATUS_LOGGED, mac %s uuid %s\n", mac, uuid);
+        ALINK_LOGI("ALINK_STATUS_LOGGED, mac %s uuid %s", mac, uuid);
         break;
     default:
         break;
@@ -197,11 +199,10 @@ static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
 }
 
 
-
 static void alink_fill_deviceinfo(struct device_info *deviceinfo)
 {   /*fill main device info here */
     product_get_name(deviceinfo->name);
-    product_get_sn(deviceinfo->sn);  // 产品注册方式 如果是sn, 那么需要保障sn唯一
+    product_get_sn(deviceinfo->sn);  // Product registration if it is sn, then need to protect the only sn
     product_get_key(deviceinfo->key);
     product_get_model(deviceinfo->model);
     product_get_secret(deviceinfo->secret);
@@ -211,9 +212,9 @@ static void alink_fill_deviceinfo(struct device_info *deviceinfo)
     product_get_manufacturer(deviceinfo->manufacturer);
     product_get_debug_key(deviceinfo->key_sandbox);
     product_get_debug_secret(deviceinfo->secret_sandbox);
-    platform_wifi_get_mac(deviceinfo->mac);//产品注册mac唯一 or sn唯一  统一大写
-    product_get_cid(deviceinfo->cid); // 使用接口获取唯一chipid,防伪造设备
-    printf("DEV_MODEL:%s \n", deviceinfo->model);
+    platform_wifi_get_mac(deviceinfo->mac);//Product registration mac only or sn only unified uppercase
+    product_get_cid(deviceinfo->cid); // Use the interface to obtain a unique chipid, anti-counterfeit device
+    ALINK_LOGI("DEV_MODEL:%s", deviceinfo->model);
 }
 
 void alink_json(void *arg)
@@ -237,7 +238,7 @@ void alink_json(void *arg)
 
     platform_free(main_dev);
 
-    printf("wait main device login");
+    ALINK_LOGI("wait main device login");
     /*wait main device login, -1 means wait forever */
     alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
 

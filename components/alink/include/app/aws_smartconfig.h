@@ -1,5 +1,7 @@
 #ifndef __AWS_SMARTCONFIG_H__
 #define __AWS_SMARTCONFIG_H__
+#include "alink_user_config.h"
 
-BaseType_t aws_smartconfig_init(wifi_config_t *wifi_config);
+alink_err_t aws_smartconfig_init(_OUT_ wifi_config_t *wifi_config);
+
 #endif

@@ -34,29 +34,29 @@ extern "C"
 #endif
 
 /* mask next line, if stdlib is not used */
-#define USE_STDLIB_H 
+#define USE_STDLIB_H
 
 /* mask next line, if stdint.h is not defined */
 #define USE_STDINT_H
 
 
-#ifdef USE_STDLIB_H 
-    #include <stdio.h>
-    #include <stdarg.h>
-    #include <string.h>
+#ifdef USE_STDLIB_H
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
 #endif
 
 
 #ifdef USE_STDINT_H
-    #include <stdint.h>
+#include <stdint.h>
 #else
-    typedef signed char        int8_t;
-    typedef signed short       int16_t;
-    typedef signed int         int32_t;
-    typedef unsigned char      uint8_t;
-    typedef unsigned short     uint16_t;
-    typedef unsigned int       uint32_t;
-    typedef unsigned long long uint64_t;
+typedef signed char        int8_t;
+typedef signed short       int16_t;
+typedef signed int         int32_t;
+typedef unsigned char      uint8_t;
+typedef unsigned short     uint16_t;
+typedef unsigned int       uint32_t;
+typedef unsigned long long uint64_t;
 #endif
 
 /** @defgroup group_platform group_platform
@@ -68,17 +68,17 @@ extern "C"
  *  @{
  */
 
-#define _IN_			/**< indicate that this is a input parameter. */
-#define _OUT_			/**< indicate that this is a output parameter. */
-#define _INOUT_			/**< indicate that this is a io parameter. */
-#define _IN_OPT_		/**< indicate that this is a optional input parameter. */
-#define _OUT_OPT_		/**< indicate that this is a optional output parameter. */
-#define _INOUT_OPT_		/**< indicate that this is a optional io parameter. */
+#define _IN_            /**< indicate that this is a input parameter. */
+#define _OUT_           /**< indicate that this is a output parameter. */
+#define _INOUT_         /**< indicate that this is a io parameter. */
+#define _IN_OPT_        /**< indicate that this is a optional input parameter. */
+#define _OUT_OPT_       /**< indicate that this is a optional output parameter. */
+#define _INOUT_OPT_     /**< indicate that this is a optional io parameter. */
 
 
-#define PLATFORM_SOCKET_MAXNUMS			(10)
-#define PLATFORM_WAIT_INFINITE			(~0)
-#define PLATFORM_INVALID_FD	    		((void *)-1)
+#define PLATFORM_SOCKET_MAXNUMS         (10)
+#define PLATFORM_WAIT_INFINITE          (~0)
+#define PLATFORM_INVALID_FD             ((void *)-1)
 
 #define STR_SHORT_LEN                   (32)
 #define STR_LONG_LEN                    (128)
@@ -101,7 +101,7 @@ extern "C"
  * @param[out] thread @n The new thread handle.
  * @param[in] name @n thread name.
  * @param[in] start_routine @n A pointer to the application-defined function to be executed by the thread.
-		This pointer represents the starting address of the thread.
+        This pointer represents the starting address of the thread.
  * @param[in] arg @n A pointer to a variable to be passed to the start_routine.
  * @param[in] stack @n A pointer to stack buffer malloced by caller, if platform used this buffer, set stack_used to non-zero value,  otherwise set it to 0.
  * @param[in] stack_size @n The initial size of the stack, in bytes. see platform_get_thread_stack_size().
@@ -116,13 +116,13 @@ extern "C"
  * @note None.
  */
 int platform_thread_create(
-		_OUT_ void **thread,
-		_IN_ const char *name,
-		_IN_ void *(*start_routine) (void *),
-		_IN_ void *arg,
-		_IN_ void *stack,
-		_IN_ uint32_t stack_size,
-		_OUT_ int *stack_used);
+    _OUT_ void **thread,
+    _IN_ const char *name,
+    _IN_ void *(*start_routine) (void *),
+    _IN_ void *arg,
+    _IN_ void *stack,
+    _IN_ uint32_t stack_size,
+    _OUT_ int *stack_used);
 
 
 
@@ -328,9 +328,9 @@ void platform_free(_IN_ void *ptr);
  */
 typedef struct
 {
-	char *host; /**< host ip(dotted-decimal notation) or host name(string) */
-	uint16_t port; /**< udp port or tcp port */
-}platform_netaddr_t, *pplatform_netaddr_t;
+    char *host; /**< host ip(dotted-decimal notation) or host name(string) */
+    uint16_t port; /**< udp port or tcp port */
+} platform_netaddr_t, *pplatform_netaddr_t;
 
 
 
@@ -410,10 +410,10 @@ void platform_udp_close(_IN_ void *handle);
  * @note blocking API.
  */
 int platform_udp_sendto(
-		_IN_ void *handle,
-		_IN_ const char *buffer,
-		_IN_ uint32_t length,
-		_IN_ platform_netaddr_t *netaddr);
+    _IN_ void *handle,
+    _IN_ const char *buffer,
+    _IN_ uint32_t length,
+    _IN_ platform_netaddr_t *netaddr);
 
 
 /**
@@ -433,10 +433,10 @@ int platform_udp_sendto(
  * @note blocking API.
  */
 int platform_udp_recvfrom(
-		_IN_ void *handle,
-		_OUT_ char *buffer,
-		_IN_ uint32_t length,
-		_OUT_ platform_netaddr_t *netaddr);
+    _IN_ void *handle,
+    _OUT_ char *buffer,
+    _IN_ uint32_t length,
+    _OUT_ platform_netaddr_t *netaddr);
 
 
 
@@ -563,9 +563,9 @@ void platform_tcp_close(_IN_ void *handle);
  * @note None.
  */
 int platform_select(
-		_INOUT_OPT_ void *read_fds[PLATFORM_SOCKET_MAXNUMS],
-		_INOUT_OPT_ void *write_fds[PLATFORM_SOCKET_MAXNUMS],
-		_IN_ int timeout_ms);
+    _INOUT_OPT_ void *read_fds[PLATFORM_SOCKET_MAXNUMS],
+    _INOUT_OPT_ void *write_fds[PLATFORM_SOCKET_MAXNUMS],
+    _IN_ int timeout_ms);
 
 
 /** @} */ //end of platform_network
@@ -583,11 +583,11 @@ int platform_select(
  *
  * @param[in] tcp_fd @n The network connection handle.
  * @param[in] server_cert @n Specify the sever certificate which is PEM format in default (It
- *   will be converted to the formart your need, if special requriements in your platform. 
+ *   will be converted to the formart your need, if special requriements in your platform.
  *   Please contact Ali). Both root cert(CA) and user cert should be supported.
  * @param[in] server_cert_len @n Length of sever certificate, in bytes.
  * @return
-   @verbatim 
+   @verbatim
    != NULL, SSL handle.
    = NULL, failed.
    @endverbatim
@@ -638,7 +638,7 @@ int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length);
  *
  * @param[in] ssl: @n the specified connection.
  * @return
-   @verbatim 
+   @verbatim
    = 0, success.
    != 0, fail.
    @endverbatim
@@ -779,7 +779,7 @@ void platform_printf(_IN_ const char *fmt, ...);
  *  @{
  */
 
-#define PLATFORM_CONFIG_SIZE	(2048)
+#define PLATFORM_CONFIG_SIZE    (2048)
 
 /**
  * @brief Read configure data from the start of configure zone.
@@ -821,7 +821,7 @@ int platform_config_write(_IN_ const char *buffer, _IN_ int length);
  *  @{
  */
 
-   
+
 #define PLATFORM_MODULE_NAME_LEN   STR_SHORT_LEN
 /**
  * @brief Get wifi module name.
@@ -845,7 +845,7 @@ char *platform_get_module_name(_OUT_ char name_str[PLATFORM_MODULE_NAME_LEN]);
 int platform_wifi_get_rssi_dbm(void);
 
 
-#define PLATFORM_MAC_LEN	(17 + 1)
+#define PLATFORM_MAC_LEN    (17 + 1)
 /**
  * @brief Get WIFI MAC string with format like: xx:xx:xx:xx:xx:xx.
  *
@@ -863,7 +863,7 @@ char *platform_wifi_get_mac(_OUT_ char mac_str[PLATFORM_MAC_LEN]);
    and return IP with binary form, in network byte order.
  *
  * @param[out] ip_str @n Buffer for using to store IP string, in numbers-and-dots notation form.
- * @return 
+ * @return
    @verbatim
    = 0, failed.
    != 0, IP address with hex form, in network byte order.
@@ -942,7 +942,7 @@ typedef enum AWSS_LINK_TYPE {
     AWSS_LINK_TYPE_PRISM,
     AWSS_LINK_TYPE_80211_RADIO,
     AWSS_LINK_TYPE_80211_RADIO_AVS
-}platform_awss_link_type_t;
+} platform_awss_link_type_t;
 
 
 /**
@@ -963,7 +963,7 @@ typedef enum AWSS_LINK_TYPE {
  *@param[in] with_fcs @n 80211 frame buffer include fcs(4 byte) or not
  *                                                                                */
 typedef int (*platform_awss_recv_80211_frame_cb_t)(char *buf, int length,
-                platform_awss_link_type_t link_type, int with_fcs);
+        platform_awss_link_type_t link_type, int with_fcs);
 
 
 /**
@@ -992,7 +992,7 @@ void platform_awss_close_monitor(void);
 
 
 #ifndef ETH_ALEN
-#define ETH_ALEN		(6)
+#define ETH_ALEN        (6)
 #endif
 /**
  * @brief Switch to specific wifi channel.
@@ -1005,9 +1005,9 @@ void platform_awss_close_monitor(void);
  * @note None.
  */
 void platform_awss_switch_channel(
-		_IN_ char primary_channel,
-		_IN_ char secondary_channel,
-		_IN_ char bssid[ETH_ALEN]);
+    _IN_ char primary_channel,
+    _IN_ char secondary_channel,
+    _IN_ char bssid[ETH_ALEN]);
 
 /** @} */ //end of platform__awss
 

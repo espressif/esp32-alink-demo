@@ -13,7 +13,9 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
+#include "alink_user_config.h"
 
+static const char *TAG = "alink_key";
 #define ESP_INTR_FLAG_DEFAULT 0
 static xQueueHandle gpio_evt_queue = NULL;
 
@@ -49,16 +51,15 @@ void alink_key_init(uint32_t key_gpio_pin)
 }
 
 
-BaseType_t alink_key_scan(TickType_t ticks_to_wait)
+alink_err_t alink_key_scan(TickType_t ticks_to_wait)
 {
     uint32_t io_num;
+    alink_err_t ret;
     BaseType_t press_key = pdFALSE;
     BaseType_t lift_key = pdFALSE;
     for (;;) {
-        if (xQueueReceive(gpio_evt_queue, &io_num, ticks_to_wait) == pdFALSE) {
-            printf("xQueueReceive is error\n");
-            return pdFALSE;
-        }
+        ret = xQueueReceive(gpio_evt_queue, &io_num, ticks_to_wait);
+        ALINK_ERROR_CHECK(ret != pdTRUE, ALINK_ERR, "xQueueReceive, ret:%d", ret);
 
         if (gpio_get_level(io_num) == 0) {
             lift_key = pdTRUE;
@@ -68,7 +69,7 @@ BaseType_t alink_key_scan(TickType_t ticks_to_wait)
         if (press_key & lift_key) {
             press_key = pdFALSE;
             lift_key = pdFALSE;
-            return pdTRUE;
+            return ALINK_OK;
         }
     }
 }

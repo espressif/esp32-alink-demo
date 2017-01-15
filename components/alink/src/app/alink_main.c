@@ -27,108 +27,116 @@
 #include "aws_smartconfig.h"
 #include "aws_softap.h"
 #include "esp_partition.h"
+#include "alink_user_config.h"
 static const char *TAG = "alink_main";
 
-#define WIFI_WAIT_TIME      (60 * 1000 / portTICK_RATE_MS)
 static SemaphoreHandle_t xSemConnet = NULL;
+static SemaphoreHandle_t xSemAinkInitFinsh = NULL;
 void alink_passthroug(void *arg);
 void alink_json(void *arg);
 void alink_key_init(uint32_t key_gpio_pin);
-BaseType_t alink_key_scan(TickType_t ticks_to_wait);
+alink_err_t alink_key_scan(TickType_t ticks_to_wait);
 
-BaseType_t alink_read_wifi_config(wifi_config_t *wifi_config)
+alink_err_t alink_read_wifi_config(_OUT_ wifi_config_t *wifi_config)
 {
-    BaseType_t ret     = -1;
+    ALINK_PARAM_CHECK(wifi_config == NULL);
+    alink_err_t ret     = -1;
     nvs_handle handle = 0;
     size_t length = sizeof(wifi_config_t);
-    if (wifi_config == NULL) return pdFALSE;
+    memset(wifi_config, 0, length);
 
     ret = nvs_open("ALINK", NVS_READWRITE, &handle);
-    if (ret != 0) return pdFALSE;
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_open ret:%x", ret);
     ret = nvs_get_blob(handle, "wifi_config", wifi_config, &length);
     nvs_close(handle);
-    return (ret) ? pdFALSE : pdTRUE;
+    if (ret == ESP_ERR_NVS_NOT_FOUND) {
+        ALINK_LOGD("[%s, %d]:nvs_get_blob ret:%x,No data storage,the read data is empty\n",
+                   __func__, __LINE__ , ret);
+        return ALINK_ERR;
+    }
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_get_blob ret:%x", ret);
+    return ALINK_OK;
 }
 
-BaseType_t alink_write_wifi_config(wifi_config_t *wifi_config)
+alink_err_t alink_write_wifi_config(_IN_ const wifi_config_t *wifi_config)
 {
-    BaseType_t ret     = -1;
+    ALINK_PARAM_CHECK(wifi_config == NULL);
+    alink_err_t ret     = -1;
     nvs_handle handle = 0;
-    if (wifi_config == NULL) return pdFALSE;
 
     ret = nvs_open("ALINK", NVS_READWRITE, &handle);
-    if (ret != 0) return pdFALSE;
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_open ret:%x", ret);
     ret = nvs_set_blob(handle, "wifi_config", wifi_config, sizeof(wifi_config_t));
     nvs_commit(handle);
     nvs_close(handle);
-    return (ret) ? pdFALSE : pdTRUE;
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_set_blob ret:%x", ret);
+    return ALINK_OK;
 }
 
-
-BaseType_t alink_erase_wifi_config()
+alink_err_t alink_erase_wifi_config()
 {
-    esp_err_t ret     = -1;
+    alink_err_t ret     = -1;
     nvs_handle handle = 0;
 
     ret = nvs_open("ALINK", NVS_READWRITE, &handle);
-    if (ret != 0) return pdFALSE;
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_open ret:%x", ret);
     ret = nvs_erase_key(handle, "wifi_config");
     nvs_commit(handle);
-    nvs_close(handle);
-    return (ret) ? pdFALSE : pdTRUE;
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_erase_key ret:%x", ret);
+    return ALINK_OK;
 }
 
-BaseType_t alink_erase_all_config()
+alink_err_t alink_erase_all_config()
 {
-    esp_err_t ret     = -1;
+    alink_err_t ret     = -1;
     nvs_handle handle = 0;
 
     ret = nvs_open("ALINK", NVS_READWRITE, &handle);
-    if (ret != 0) return pdFALSE;
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_open ret:%x", ret);
     ret = nvs_erase_all(handle);
     nvs_commit(handle);
     nvs_close(handle);
-    return (ret) ? pdFALSE : pdTRUE;
+    ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_erase_key ret:%x", ret);
+    return ALINK_OK;
 }
-
 
 void factory_reset(void* arg)
 {
-    if (alink_key_scan(portMAX_DELAY) == pdFALSE) {
-        printf(" key no pass\n");
-    } else {
-        /* set partition to  */
-        alink_factory_reset();
+    if (xSemAinkInitFinsh == NULL) xSemAinkInitFinsh = xSemaphoreCreateBinary();
+    alink_err_t ret = alink_key_scan(portMAX_DELAY);
+    ALINK_ERROR_CHECK(ret != ALINK_OK, vTaskDelete(NULL), "alink_key_scan ret:%d", ret);
+    /* clear ota data  */
+    alink_err_t err;
+    esp_partition_t find_partition;
+    memset(&find_partition, 0, sizeof(esp_partition_t));
+    find_partition.type = ESP_PARTITION_TYPE_DATA;
+    find_partition.subtype = ESP_PARTITION_SUBTYPE_DATA_OTA;
 
-        ets_printf("[%s, %d]:\n", __func__, __LINE__);
-        esp_err_t err;
-        esp_partition_t find_partition;
-        memset(&find_partition, 0, sizeof(esp_partition_t));
-        find_partition.type = ESP_PARTITION_TYPE_DATA;
-        find_partition.subtype = ESP_PARTITION_SUBTYPE_DATA_OTA;
+    const esp_partition_t *partition = esp_partition_find_first(find_partition.type, find_partition.subtype, NULL);
+    ALINK_ERROR_CHECK(partition == NULL, ; , "nvs_erase_key ret");
+    err = esp_partition_erase_range(partition, 0, partition->size);
+    ALINK_ERROR_CHECK(err != ESP_OK, ; , "esp_partition_erase_range ret:%x", err);
 
-        const esp_partition_t *partition = esp_partition_find_first(find_partition.type, find_partition.subtype, NULL);
-        if (partition == NULL) {
-            ESP_LOGE(TAG, "esp_partition_find_first failed! partition=%p", partition);
-            vTaskDelete(NULL);
-        }
-        ets_printf("[%s, %d]: partition->address: %x, partition->size:%x\n", __func__, __LINE__, partition->address, partition->size);
-        err = esp_partition_erase_range(partition, 0, partition->size);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "esp_partition_erase_range failed! err=0x%x", err);
-            vTaskDelete(NULL);
-        }
-
-        // alink_erase_all_config();
-        alink_erase_wifi_config();
-        ets_printf("[%s, %d]:\n", __func__, __LINE__);
-        esp_restart();
-        // ets_printf("[%s, %d]:\n", __func__, __LINE__);
+    if (err != ALINK_OK) {
+        ALINK_LOGE("esp_partition_erase_range failed! err=0x%x", err);
+        vTaskDelete(NULL);
     }
+
+    // alink_erase_all_config();
+    alink_erase_wifi_config();
+
+    if (xSemaphoreTake(xSemAinkInitFinsh, 0) != pdTRUE) {
+        ALINK_LOGW("alink_os is not initialized, Unable to unbundle");
+    } else {
+        alink_factory_reset();
+    }
+    ALINK_LOGI("factory_reset is finsh, The system is about to be restarted");
+    esp_restart();
+
     vTaskDelete(NULL);
 }
 
-static esp_err_t event_handler(void *ctx, system_event_t *event)
+static alink_err_t event_handler(void *ctx, system_event_t *event)
 {
     if (xSemConnet == NULL)
         xSemConnet = xSemaphoreCreateBinary();
@@ -147,65 +155,58 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
     default:
         break;
     }
-    return ESP_OK;
+    return ALINK_OK;
 }
 
-static BaseType_t wifi_sta_connect_ap(wifi_config_t *wifi_config, TickType_t ticks_to_wait)
+static alink_err_t wifi_sta_connect_ap(wifi_config_t *wifi_config, TickType_t ticks_to_wait)
 {
-    BaseType_t ret = pdFALSE;
-    // ESP_ERROR_CHECK( esp_wifi_stop() );
+    ALINK_PARAM_CHECK(wifi_config == NULL);
     printf("WiFi SSID: %s, password: %s\n", wifi_config->ap.ssid, wifi_config->ap.password);
 
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, wifi_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
 
-    ret = xSemaphoreTake(xSemConnet, ticks_to_wait);
-    if (ret == pdFALSE) {
-        ESP_ERROR_CHECK( esp_wifi_stop() );
-        ets_printf("[%s, %d]: connect wifi is err\n", __func__, __LINE__);
-    }
-    return ret;
+    BaseType_t err = xSemaphoreTake(xSemConnet, ticks_to_wait);
+    ALINK_ERROR_CHECK(err != pdTRUE, ALINK_ERR, "xSemaphoreTake ret:%x wait: %d", err, ticks_to_wait);
+    return ALINK_OK;
 }
 
-
-BaseType_t alink_connect_ap()
+alink_err_t alink_connect_ap()
 {
-    BaseType_t ret = pdFALSE;
+    alink_err_t ret = ALINK_ERR;
     wifi_config_t wifi_config;
     esp_event_loop_set_cb(event_handler, NULL);
     xSemConnet = xSemaphoreCreateBinary();
 
     ret = alink_read_wifi_config(&wifi_config);
-    if (ret == pdTRUE) {
-        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == pdTRUE)
-            return pdTRUE;
+    if (ret == ALINK_OK) {
+        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)
+            return ALINK_OK;
     }
     esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
 
     ret = aws_smartconfig_init(&wifi_config);
-    if (ret == pdTRUE) {
-        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == pdTRUE)
+    if (ret == ALINK_OK) {
+        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)
             goto EXIT;
     }
 
     printf("********ENTER SOFTAP MODE******\n");
     ret = aws_softap_init(&wifi_config);
-    if (ret == pdTRUE) {
-        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == pdTRUE)
+    if (ret == ALINK_OK) {
+        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)
             goto EXIT;
     }
 
-    return pdFALSE;
+    return ALINK_ERR;
 EXIT:
+
     alink_write_wifi_config(&wifi_config);
     aws_notify_app();
     aws_destroy();
-    return pdTRUE;
+    return ALINK_OK;
 }
-
-
-
 
 /******************************************************************************
  * FunctionName : esp_alink_init
@@ -215,9 +216,9 @@ EXIT:
 *******************************************************************************/
 void esp_alink_init()
 {
-    alink_key_init(0);
-    xTaskCreate(factory_reset, "factory_reset", 4096, NULL, 10, NULL);
     alink_connect_ap();
-    xTaskCreate(alink_json, "alink_json", 1024 * 6, NULL, 4, NULL);
-    // xTaskCreate(alink_passthroug, "alink_passthroug", 4096, NULL, 4, NULL);
+    alink_key_init(ALINK_RESET_KEY_IO);
+    xTaskCreate(factory_reset, "factory_reset", 1024 * 4, NULL, 10, NULL);
+    xTaskCreate(alink_json, "alink_json", 1024 * 4, NULL, 9, NULL);
+    // xTaskCreate(alink_passthroug, "alink_passthroug", 1024 * 4, NULL, 9, NULL);
 }

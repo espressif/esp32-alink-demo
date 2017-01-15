@@ -12,75 +12,74 @@
 #include "lwip/netdb.h"
 
 #include "platform/platform.h"
+#include "alink_user_config.h"
 
 static SSL_CTX *ctx = NULL;
 static const char *TAG = "alink_ssl";
-#define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
-#define require_action_NULL(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); return NULL;}
 
 void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_ int server_cert_len)
 {
-    require_action_exit(tcp_fd == NULL, "[%s, %d]:Parameter error tcp_fd == NULL", __func__, __LINE__);
-    require_action_exit(server_cert == NULL, "[%s, %d]:Parameter error server_cert == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(tcp_fd == NULL);
+    ALINK_PARAM_CHECK(server_cert == NULL);
 
     SSL *ssl;
     int socket = (int)tcp_fd;
     int ret = -1;
-    ESP_LOGD(TAG, "[%s, %d]:tcp_fd: %d, server_cert: %p, server_cert_len: %d\n",
+    ALINK_LOGD("[%s, %d]:tcp_fd: %d, server_cert: %p, server_cert_len: %d",
              __func__, __LINE__, socket, server_cert, server_cert_len);
 
 
     ctx = SSL_CTX_new(TLSv1_1_client_method());
-    require_action_NULL(ctx == NULL, "[%s, %d]:SSL_CTX_new", __func__, __LINE__)
+    ALINK_ERROR_CHECK(ctx == NULL, NULL, "SSL_CTX_new, ret:%p", ctx);
+
     ssl = SSL_new(ctx);
-    require_action_NULL(ssl == NULL, "[%s, %d]:SSL_new", __func__, __LINE__);
+    ALINK_ERROR_CHECK(ssl == NULL, NULL, "SSL_new, ret: %p", ssl);
+
     SSL_set_fd(ssl, socket);
     X509 *ca_cert = d2i_X509(NULL, (unsigned char *)server_cert, server_cert_len);
-    require_action_NULL(ca_cert == NULL, "[%s, %d]:d2i_X509", __func__, __LINE__);
+    ALINK_ERROR_CHECK(ca_cert == NULL, NULL, "d2i_X509, ret: %p", ca_cert);
 
     ret = SSL_add_client_CA(ssl, ca_cert);
-    require_action_NULL(ret == -1, "[%s, %d]:SSL_add_client_CA", __func__, __LINE__);
+    ALINK_ERROR_CHECK(ret != pdTRUE, NULL, "SSL_add_client_CA, ret:%d", ret);
 
     ret = SSL_connect(ssl);
-    require_action_NULL(ret == -1, "[%s, %d]:SSL_connect", __func__, __LINE__);
+    ALINK_ERROR_CHECK(ret != pdTRUE, NULL, "SSL_connect, ret: %d", ret);
 
-    ESP_LOGD(TAG, "[%s, %d]:ssl: %p", __func__, __LINE__, ssl);
     return (void *)(ssl);
 }
 
 int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
 {
-    // require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
-    require_action_exit(length == 0, "[%s, %d]:Parameter error length == 0", __func__, __LINE__);
-    if (ssl == NULL) {
-        ESP_LOGE(TAG, "[%s, %d]:Parameter error ssl: %p", __func__, __LINE__, ssl);
-        return -1;
-    }
-    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(length <= 0);
+    ALINK_PARAM_CHECK(buffer == NULL);
+    // ALINK_PARAM_CHECK(ssl == NULL);
+    ALINK_ERROR_CHECK(ssl == NULL, ALINK_ERR, "Parameter error, ssl:%p", ssl);
 
-    int ret = -1;
+    alink_err_t ret;
     ret = SSL_write((SSL *)ssl, buffer, length);
-    if (ret <= 0) ESP_LOGE(TAG, "[%s, %d]:SSL_write:%d", __func__, __LINE__, ret);
+    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_write, ret:%d", ret);
+
     return ret;
 }
 
 int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
 {
-    require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
-    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(ssl == NULL);
+    ALINK_PARAM_CHECK(buffer == NULL);
     int ret = -1;
     ret = SSL_read((SSL*)ssl, buffer, length);
-    if (ret <= 0) ESP_LOGE(TAG, "[%s, %d]:SSL_read:%d", __func__, __LINE__, ret);
+    if (ret <= 0) ALINK_LOGE("[%s, %d]:SSL_read:%d", __func__, __LINE__, ret);
     return ret;
 }
 
 int platform_ssl_close(_IN_ void *ssl)
 {
-    require_action_exit(ssl == NULL, "[%s, %d]:Parameter error ssl == NULL", __func__, __LINE__);
-    int ret = -1;
+    ALINK_PARAM_CHECK(ssl == NULL);
+    alink_err_t ret = -1;
     ret = SSL_shutdown((SSL *)ssl);
-    if (ret != 1) {
-        ESP_LOGW(TAG, "[%s, %d]:SSL_shutdown: ret:%d, ssl: %p",
+
+    if (ret != pdTRUE) {
+        ALINK_LOGW("[%s, %d]:SSL_shutdown: ret:%d, ssl: %p",
                  __func__, __LINE__, ret, ssl);
     }
 
@@ -97,6 +96,7 @@ int platform_ssl_close(_IN_ void *ssl)
     }
 
     if (fd >= 0) close(fd);
-    else ESP_LOGE(TAG, "[%s, %d]:SSL_get_fd:%d", __func__, __LINE__, fd);
-    return ret;
+    else ALINK_LOGE("[%s, %d]:SSL_get_fd:%d", __func__, __LINE__, fd);
+
+    return (ret == pdTRUE) ? ALINK_OK : ALINK_ERR;
 }

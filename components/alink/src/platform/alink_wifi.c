@@ -10,10 +10,10 @@
 
 #include "platform.h"
 #include "alink_export.h"
+#include "alink_user_config.h"
 
 static platform_awss_recv_80211_frame_cb_t g_sniffer_cb = NULL;
 static const char *TAG = "alink_wifi";
-#define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
 
 //一键配置超时时间, 建议超时时间1-3min, APP侧一键配置1min超时
 int platform_awss_get_timeout_interval_ms(void)
@@ -81,7 +81,7 @@ static void IRAM_ATTR wifi_sniffer_cb_(void *recv_buf, wifi_promiscuous_pkt_type
 //若是rtos的平台，注册收包回调函数aws_80211_frame_handler()到系统接口
 void platform_awss_open_monitor(_IN_ platform_awss_recv_80211_frame_cb_t cb)
 {
-    require_action_exit(cb == NULL, "[%s, %d]:Parameter error cb == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(cb == NULL);
     if (xQueueSniffer == NULL)
         xQueueSniffer = xQueueCreate(1, sizeof(struct sniffer_data));
     xTaskCreate(platform_sniffer_cb, "platform_sniffer_cb", 1024, NULL, 4, NULL);
@@ -107,7 +107,6 @@ void platform_awss_close_monitor(void)
 
 int platform_wifi_get_rssi_dbm(void)
 {
-    ets_printf("== [%s, %d] ==\n", __func__, __LINE__);
     wifi_ap_record_t ap_infor;
     esp_wifi_sta_get_ap_info(&ap_infor);
     return ap_infor.rssi;
@@ -115,7 +114,7 @@ int platform_wifi_get_rssi_dbm(void)
 
 char *platform_wifi_get_mac(_OUT_ char mac_str[PLATFORM_MAC_LEN])
 {
-    require_action_exit(mac_str == NULL, "[%s, %d]:Parameter error mac_str == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(mac_str == NULL);
     uint8_t mac[6] = {0};
     // wifi_mode_t mode_backup;
     // esp_wifi_get_mode(&mode_backup);
@@ -123,13 +122,12 @@ char *platform_wifi_get_mac(_OUT_ char mac_str[PLATFORM_MAC_LEN])
     ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_STA, mac));
     snprintf(mac_str, PLATFORM_MAC_LEN, MACSTR, MAC2STR(mac));
     // esp_wifi_set_mode(mode_backup);
-    printf("mac: %s\n", mac_str);
     return mac_str;
 }
 
 uint32_t platform_wifi_get_ip(_OUT_ char ip_str[PLATFORM_IP_LEN])
 {
-    require_action_exit(ip_str == NULL, "[%s, %d]:Parameter error ip_str == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(ip_str == NULL);
     tcpip_adapter_ip_info_t infor;
     tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &infor);
     memcpy(ip_str, inet_ntoa(infor.ip.addr), PLATFORM_IP_LEN);

@@ -26,25 +26,22 @@
 #include "lwip/sys.h"
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
+#include "alink_user_config.h"
 
 #define BUFFSIZE 1024
 
 static const char *TAG = "alink_upgrade";
-/*an ota data write buffer ready to write to the flash*/
-static char ota_write_data[BUFFSIZE + 1] = { 0 };
 
 /* operate handle : uninitialized value is zero ,every ota begin would exponential growth*/
 static esp_ota_handle_t out_handle = 0;
 static esp_partition_t operate_partition;
-
-#define require_action_exit(con, msg, ...) if(con) {ESP_LOGE(TAG, msg, ##__VA_ARGS__); esp_restart();}
 
 void platform_firmware_upgrade_start(void)
 {
     esp_err_t err;
     const esp_partition_t *esp_current_partition = esp_ota_get_boot_partition();
     if (esp_current_partition->type != ESP_PARTITION_TYPE_APP) {
-        ESP_LOGE(TAG, "Error： esp_current_partition->type != ESP_PARTITION_TYPE_APP");
+        ALINK_LOGE("Error： esp_current_partition->type != ESP_PARTITION_TYPE_APP");
         return;
     }
 
@@ -70,31 +67,28 @@ void platform_firmware_upgrade_start(void)
     assert(partition != NULL);
     memset(&operate_partition, 0, sizeof(esp_partition_t));
     err = esp_ota_begin( partition, OTA_SIZE_UNKNOWN, &out_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_begin failed err=0x%x!", err);
-    } else {
-        memcpy(&operate_partition, partition, sizeof(esp_partition_t));
-        ESP_LOGI(TAG, "esp_ota_begin init OK");
-    }
+    ALINK_ERROR_CHECK(err != ESP_OK, ; , "esp_ota_begin, err:%x", err);
+    memcpy(&operate_partition, partition, sizeof(esp_partition_t));
+    ALINK_LOGI("esp_ota_begin init OK");
 }
 
 int platform_firmware_upgrade_write(char *buffer, uint32_t length)
 {
-    require_action_exit(length <= 0, "[%s, %d]:Parameter error length <= 0", __func__, __LINE__);
-    require_action_exit(buffer == NULL, "[%s, %d]:Parameter error buffer == NULL", __func__, __LINE__);
+    ALINK_PARAM_CHECK(length <= 0);
+    ALINK_PARAM_CHECK(buffer == NULL);
 
     esp_err_t err;
     static int binary_file_length = 0;
+    char *ota_write_data = (char *)malloc(BUFFSIZE);
+    ALINK_ERROR_CHECK(ota_write_data == NULL, ALINK_ERR, "malloc, err:%p", ota_write_data);
     memset(ota_write_data, 0, BUFFSIZE);
     memcpy(ota_write_data, buffer, length);
     err = esp_ota_write( out_handle, (const void *)ota_write_data, length);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Error: esp_ota_write failed! err=%x", err);
-        return -1;
-    }
-    binary_file_length += length;
-    ESP_LOGI(TAG, "Have written image length %d", binary_file_length);
+    ALINK_ERROR_CHECK(err != ESP_OK, ALINK_ERR, "esp_ota_begin, err:%x", err);
 
+    binary_file_length += length;
+    ALINK_LOGI("Have written image length %d", binary_file_length);
+    if (ota_write_data) free(ota_write_data);
     return 0;
 }
 
@@ -102,16 +96,12 @@ int platform_firmware_upgrade_finish(void)
 {
     esp_err_t err;
     err = esp_ota_end(out_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_end failed! err: %d", err);
-        return -1;
-    }
+    ALINK_ERROR_CHECK(err != ESP_OK, ALINK_ERR, "esp_ota_end failed! err:%d", err);
+
     err = esp_ota_set_boot_partition(&operate_partition);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_set_boot_partition failed! err=0x%x", err);
-        return -1;
-    }
-    return 0;
+    ALINK_ERROR_CHECK(err != ESP_OK, ALINK_ERR, "esp_ota_set_boot_partition failed! err:%d", err);
+
+    return ESP_OK;
 }
 #endif
 
