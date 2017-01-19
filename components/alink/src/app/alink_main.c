@@ -122,14 +122,14 @@ void factory_reset(void* arg)
         vTaskDelete(NULL);
     }
 
-    // alink_erase_all_config();
-    alink_erase_wifi_config();
-
     if (xSemaphoreTake(xSemAinkInitFinsh, 0) != pdTRUE) {
         ALINK_LOGW("alink_os is not initialized, Unable to unbundle");
     } else {
         alink_factory_reset();
     }
+    alink_erase_all_config();
+    // alink_erase_wifi_config();
+
     ALINK_LOGI("factory_reset is finsh, The system is about to be restarted");
     esp_restart();
 
@@ -214,11 +214,14 @@ EXIT:
  * Parameters   : none
  * Returns      : none
 *******************************************************************************/
-void esp_alink_init()
+void esp_alink_init(_IN_ const struct device_info *product_info)
 {
-    alink_connect_ap();
     alink_key_init(ALINK_RESET_KEY_IO);
     xTaskCreate(factory_reset, "factory_reset", 1024 * 4, NULL, 10, NULL);
+
+    product_set(product_info);
+
+    alink_connect_ap();
     xTaskCreate(alink_json, "alink_json", 1024 * 4, NULL, 9, NULL);
     // xTaskCreate(alink_passthroug, "alink_passthroug", 1024 * 4, NULL, 9, NULL);
 }

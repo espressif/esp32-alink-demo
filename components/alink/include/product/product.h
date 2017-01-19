@@ -10,6 +10,7 @@ extern "C"
 
 #include "platform/platform.h"
 #include "alink_export.h"
+#include "alink_user_config.h"
 
 /** @defgroup group_product group_product
  *  @{
@@ -35,6 +36,28 @@ extern "C"
 /** @defgroup group_product_all product_all
  *  @{
  */
+
+
+/**
+ * @brief Get the product version string.
+ *
+ * @param[in] version_str @n Buffer for using to store version string.
+ * @return The version string.
+ * @see None.
+ * @note
+ */
+alink_err_t product_get(_OUT_ struct device_info *product_info);
+
+/**
+ * @brief Get the product version string.
+ *
+ * @param[in] version_str @n Buffer for using to store version string.
+ * @return The version string.
+ * @see None.
+ * @note
+ */
+alink_err_t product_set(_IN_ const struct device_info *product_info);
+
 
 
 /**

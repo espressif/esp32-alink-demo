@@ -38,143 +38,85 @@
 #include "alink_user_config.h"
 
 static const char *TAG = "alink_json";
+static xQueueHandle xQueueUpCmd = NULL;
+static xQueueHandle xQueueDownCmd = NULL;
+static SemaphoreHandle_t xSemWrite = NULL;
+static SemaphoreHandle_t xSemRead = NULL;
+#define ALINK_DATA_LEN 512
+
 void *alink_sample_mutex;
-/*do your job here*/
-struct virtual_dev {
-    char power;
-    char temp_value;
-    char light_value;
-    char time_delay;
-    char work_mode;
-} virtual_device = {
-    0x01, 0x30, 0x50, 0, 0x01
-};
 
-static char *device_attr[5] = { "OnOff_Power", "Color_Temperature", "Light_Brightness",
-                                "TimeDelay_PowerOff", "WorkMode_MasterLight"
-                              };
-
-const char *main_dev_params =
-    "{\"OnOff_Power\": { \"value\": \"%d\" }, \"Color_Temperature\": { \"value\": \"%d\" }, \"Light_Brightness\": { \"value\": \"%d\" }, \"TimeDelay_PowerOff\": { \"value\": \"%d\"}, \"WorkMode_MasterLight\": { \"value\": \"%d\"}}";
-static char device_status_change = 1;
-
-
-static int get_device_state()
+alink_up_cmd_ptr alink_up_cmd_malloc()
 {
-    int ret = 0;
-    platform_mutex_lock(alink_sample_mutex);
-    ret = device_status_change;
-    platform_mutex_unlock(alink_sample_mutex);
-    return ret;
+    alink_up_cmd_ptr up_cmd = (alink_up_cmd_ptr)malloc(sizeof(alink_up_cmd));
+    memset(up_cmd, 0, sizeof(alink_up_cmd));
+    // up_cmd->target = (char *)malloc(ALINK_DATA_LEN);
+    up_cmd->param = (char *)malloc(ALINK_DATA_LEN);
+    // memset(up_cmd->target, 0, sizeof(ALINK_DATA_LEN));
+    memset(up_cmd->param, 0, sizeof(ALINK_DATA_LEN));
+    return up_cmd;
 }
 
-static int set_device_state(int state)
+alink_err_t alink_up_cmd_free(_IN_ alink_up_cmd_ptr up_cmd)
 {
-    platform_mutex_lock(alink_sample_mutex);
-    device_status_change = state;
-    platform_mutex_unlock(alink_sample_mutex);
-    return state;
+    ALINK_PARAM_CHECK(up_cmd == NULL);
+    // if (up_cmd->target) free(up_cmd->target);
+    if (up_cmd->param) free(up_cmd->param);
+    free(up_cmd);
+    return ALINK_OK;
 }
 
-
-#define buffer_size 512
-static int alink_device_post_data(alink_down_cmd_ptr down_cmd)
+alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src)
 {
-    alink_up_cmd up_cmd;
-    int ret = ALINK_ERR;
-    char *buffer = NULL;
-    if (get_device_state()) {
-        set_device_state(0);
-        buffer = (char *)platform_malloc(buffer_size);
-        if (buffer == NULL)
-            return -1;
-        memset(buffer, 0, buffer_size);
-        sprintf(buffer, main_dev_params, virtual_device.power,
-                virtual_device.temp_value, virtual_device.light_value,
-                virtual_device.time_delay, virtual_device.work_mode);
-        up_cmd.param = buffer;
-        if (down_cmd != NULL) {
-            up_cmd.target = down_cmd->account;
-            up_cmd.resp_id = down_cmd->id;
-        } else {
-            up_cmd.target = NULL;
-            up_cmd.resp_id = -1;
-        }
-        ret = alink_post_device_data(&up_cmd);
-        if (ret == ALINK_ERR) {
-            ALINK_LOGI("post failed!");
-            platform_msleep(2000);
-        } else {
-            ALINK_LOGI("dev post data success!");
-            device_status_change = 0;
-        }
-        if (buffer)
-            free(buffer);
-    }
-    return ret;
-
+    ALINK_PARAM_CHECK(dest == NULL);
+    ALINK_PARAM_CHECK(src == NULL);
+    dest->resp_id     = src->resp_id;
+    dest->emergency   = src->emergency;
+    if (src->param) memcpy(dest->param, src->param, strlen(src->param) + 1);
+    // if (src->target) memcpy(dest->target, src->target, strlen(src->target) + 1);
+    return ALINK_OK;
 }
+
+alink_down_cmd_ptr alink_down_cmd_malloc()
+{
+    alink_down_cmd_ptr down_cmd = (alink_down_cmd_ptr)malloc(sizeof(alink_down_cmd));
+    memset(down_cmd, 0, sizeof(alink_down_cmd));
+
+    down_cmd->account = (char *)malloc(ALINK_DATA_LEN);
+    down_cmd->param   = (char *)malloc(ALINK_DATA_LEN);
+    down_cmd->retData = (char *)malloc(ALINK_DATA_LEN);
+    memset(down_cmd->account, 0, sizeof(ALINK_DATA_LEN));
+    memset(down_cmd->param, 0, sizeof(ALINK_DATA_LEN));
+    memset(down_cmd->retData, 0, sizeof(ALINK_DATA_LEN));
+    return down_cmd;
+}
+
+alink_err_t alink_down_cmd_free(_IN_ alink_down_cmd_ptr down_cmd)
+{
+    ALINK_PARAM_CHECK(down_cmd == NULL);
+    if (down_cmd->account) free(down_cmd->account);
+    if (down_cmd->param) free(down_cmd->param);
+    if (down_cmd->retData) free(down_cmd->retData);
+    free(down_cmd);
+    return ALINK_OK;
+}
+
+alink_err_t alink_down_cmd_memcpy(_OUT_ alink_down_cmd_ptr dest, _IN_ alink_down_cmd_ptr src)
+{
+    ALINK_PARAM_CHECK(dest == NULL);
+    ALINK_PARAM_CHECK(src == NULL);
+    dest->id     = src->id;
+    dest->time   = src->time;
+    dest->method = src->method;
+    if (src->account) memcpy(dest->account, src->account, strlen(src->account) + 1);
+    if (src->param) memcpy(dest->param, src->param, strlen(src->param) + 1);
+    if (src->uuid) memcpy(dest->uuid, src->uuid, STR_UUID_LEN);
+    if (src->retData) memcpy(dest->retData, src->retData, strlen(src->retData) + 1);
+    return ALINK_OK;
+}
+
 
 /* do your job end */
-static int sample_running = ALINK_TRUE;
-static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
-{
-    int attrLen = 0, valueLen = 0, value = 0, i = 0;
-    char *valueStr = NULL, *attrStr = NULL;
-
-    /* do your job here */
-    ALINK_LOGI("%s %d ", __FUNCTION__, __LINE__);
-    ALINK_LOGI("%s %d\n%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
-    set_device_state(1);
-
-    for (i = 0; i < 5; i++) {
-        attrStr = alink_JsonGetValueByName(down_cmd->param, strlen(down_cmd->param), device_attr[i], &attrLen, 0);
-        valueStr = alink_JsonGetValueByName(attrStr, attrLen, "value", &valueLen, 0);
-
-        if (valueStr && valueLen > 0) {
-            char lastChar = *(valueStr + valueLen);
-            *(valueStr + valueLen) = 0;
-            value = atoi(valueStr);
-            *(valueStr + valueLen) = lastChar;
-            switch (i) {
-            case 0:
-                virtual_device.power = value;
-                break;
-            case 1:
-                virtual_device.temp_value = value;
-                break;
-            case 2:
-                virtual_device.light_value = value;
-                break;
-            case 3:
-                virtual_device.time_delay = value;
-                break;
-            case 4:
-                virtual_device.work_mode = value;
-                break;
-            default:
-                break;
-            }
-        }
-    }
-    // 不能阻塞
-    return 0;
-    /* do your job end! */
-}
-
-static int main_dev_get_device_status_callback(alink_down_cmd_ptr down_cmd)
-{
-    /* do your job here */
-    ALINK_LOGI("%s %d ", __FUNCTION__, __LINE__);
-    ALINK_LOGI("%s %d\n%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
-    set_device_state(1);
-    // app 是等返回还是直接获取服务端数据?
-    // 异步
-    return 0;
-    /*do your job end */
-}
-
-
 static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
 {
     char uuid[33] = { 0 };
@@ -186,7 +128,7 @@ static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
     case ALINK_STATUS_REGISTERED:
         sprintf(uuid, "%s", alink_get_uuid(NULL));
         ALINK_LOGI("ALINK_STATUS_REGISTERED, mac %s uuid %s ", mac,
-                 uuid);
+                   uuid);
         break;
     case ALINK_STATUS_LOGGED:
         sprintf(uuid, "%s", alink_get_uuid(NULL));
@@ -198,6 +140,102 @@ static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
     return 0;
 }
 
+static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
+{
+    alink_down_cmd_ptr q_data = alink_down_cmd_malloc();
+    alink_down_cmd_memcpy(q_data, down_cmd);
+
+    if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
+        ALINK_LOGW("[%s, %d]:xQueueSend xQueueDownCmd is err", __FUNCTION__, __LINE__);
+    }
+    return ALINK_OK;
+}
+
+static int main_dev_get_device_status_callback(alink_down_cmd_ptr down_cmd)
+{
+    /* do your job here */
+    ALINK_LOGI("%s %d ", __FUNCTION__, __LINE__);
+    ALINK_LOGI("%s %d\n%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
+    alink_down_cmd_ptr q_data = alink_down_cmd_malloc();
+    alink_down_cmd_memcpy(q_data, down_cmd);
+
+    if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
+        ALINK_LOGW("[%s, %d]:xQueueSend xQueueDownCmd is err", __FUNCTION__, __LINE__);
+    }
+    return ALINK_OK;
+    /*do your job end */
+}
+
+static int alink_device_post_data(alink_down_cmd_ptr down_cmd)
+{
+    alink_err_t ret = ALINK_ERR;
+    alink_up_cmd_ptr up_cmd = NULL;
+    ret = xQueueReceive(xQueueUpCmd, &up_cmd, portMAX_DELAY);
+    if (ret == pdFALSE) {
+        ALINK_LOGD("There is no data to report");
+        ret = ALINK_ERR;
+        goto POST_DATA_EXIT;
+    }
+
+    if (down_cmd != NULL) {
+        up_cmd->target = down_cmd->account;
+        up_cmd->resp_id = down_cmd->id;
+    } else {
+        up_cmd->target = NULL;
+        up_cmd->resp_id = -1;
+    }
+
+    ret = alink_post_device_data(up_cmd);
+    if (ret == ALINK_ERR) {
+        ALINK_LOGI("post failed!");
+        platform_msleep(2000);
+        ret = ALINK_ERR;
+        goto POST_DATA_EXIT;
+    }
+    ALINK_LOGI("dev post data success!");
+
+POST_DATA_EXIT:
+    if (up_cmd) alink_up_cmd_free(up_cmd);
+    return ret;
+}
+
+
+alink_err_t alink_write(alink_up_cmd_ptr up_cmd, TickType_t ticks_to_wait)
+{
+    ALINK_PARAM_CHECK(up_cmd == NULL);
+    xSemaphoreTake(xSemWrite, portMAX_DELAY);
+    ALINK_LOGI("[%s, %d]:%p %d\n%s", __FUNCTION__, __LINE__, up_cmd->target, up_cmd->resp_id, up_cmd->param);
+    alink_err_t ret = ALINK_ERR;
+    alink_up_cmd_ptr q_data = alink_up_cmd_malloc();
+    alink_up_cmd_memcpy(q_data, up_cmd);
+    ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
+    if (ret == pdFALSE) {
+        ALINK_LOGE("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        xSemaphoreGive(xSemWrite);
+        return ALINK_ERR;
+    }
+    xSemaphoreGive(xSemWrite);
+    return ALINK_OK;
+}
+
+alink_err_t alink_read(alink_down_cmd_ptr down_cmd, TickType_t ticks_to_wait)
+{
+    ALINK_PARAM_CHECK(down_cmd == NULL);
+    xSemaphoreTake(xSemRead, portMAX_DELAY);
+    alink_err_t ret = ALINK_ERR;
+
+    alink_down_cmd_ptr q_data = NULL;
+    ret = xQueueReceive(xQueueDownCmd, &q_data, ticks_to_wait);
+    if (ret == pdFALSE) {
+        ALINK_LOGE("xQueueReceive xQueueDownCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        xSemaphoreGive(xSemRead);
+        return ALINK_ERR;
+    }
+    alink_down_cmd_memcpy(down_cmd, q_data);
+    alink_down_cmd_free(q_data);
+    xSemaphoreGive(xSemRead);
+    return ALINK_OK;
+}
 
 static void alink_fill_deviceinfo(struct device_info *deviceinfo)
 {   /*fill main device info here */
@@ -217,11 +255,17 @@ static void alink_fill_deviceinfo(struct device_info *deviceinfo)
     ALINK_LOGI("DEV_MODEL:%s", deviceinfo->model);
 }
 
+static int sample_running = ALINK_TRUE;
 void alink_json(void *arg)
 {
     struct device_info *main_dev;
     main_dev = platform_malloc(sizeof(struct device_info));
     alink_sample_mutex = platform_mutex_init();
+    xQueueUpCmd = xQueueCreate(3, sizeof(alink_up_cmd_ptr));
+    xQueueDownCmd = xQueueCreate(3, sizeof(alink_down_cmd_ptr));
+    xSemWrite = xSemaphoreCreateMutex();
+    xSemRead = xSemaphoreCreateMutex();
+
     memset(main_dev, 0, sizeof(struct device_info));
     alink_fill_deviceinfo(main_dev);
     alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
@@ -244,11 +288,10 @@ void alink_json(void *arg)
 
     while (sample_running) {
         alink_device_post_data(NULL);
-        platform_msleep(500);
+        // platform_msleep(500);
     }
 
     alink_end();
     platform_mutex_destroy(alink_sample_mutex);
     vTaskDelete(NULL);
 }
-

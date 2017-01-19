@@ -42,33 +42,43 @@ struct sniffer_data
     char *buf;
 };
 
+#if 0
+
+struct sniffer_data
+{
+    uint16_t len;
+    char *buf;
+};
+
 static xQueueHandle xQueueSniffer = NULL;
 static void platform_sniffer_cb(void *arg)
 {
-    struct sniffer_data data;
+    struct sniffer_data *data = NULL;
     while (1) {
         if (xQueueReceive(xQueueSniffer, &data, portMAX_DELAY) == pdFALSE) {
-            printf("platform_sniffer_cb xQueueReceive is err\n");
+            ALINK_LOGE("platform_sniffer_cb xQueueReceive is err");
             break;
         }
-        if (g_sniffer_cb == NULL) break;
+        if (g_sniffer_cb == NULL || data == NULL) break;
 
-        g_sniffer_cb(data.buf, data.len, AWSS_LINK_TYPE_NONE, 1);
-        if (data.buf) free(data.buf);
+        g_sniffer_cb(data->buf, data->len, AWSS_LINK_TYPE_NONE, 1);
+        if (data) free(data);
+        if (data->buf) free(data->buf);
     }
+    ALINK_LOGD("platform_sniffer_cb exit");
     vTaskDelete(NULL);
 }
 
 
 static void IRAM_ATTR wifi_sniffer_cb_(void *recv_buf, wifi_promiscuous_pkt_type_t type)
 {
-    struct sniffer_data data;
+    struct sniffer_data *data = (struct sniffer_data *)malloc(sizeof(struct sniffer_data));
     if (type == WIFI_PKT_CTRL) return;
     wifi_promiscuous_pkt_t *sniffer = (wifi_promiscuous_pkt_t*)recv_buf;
 
-    data.len = sniffer->rx_ctrl.sig_len;
-    data.buf = (char *)malloc(data.len);
-    memcpy(data.buf, sniffer->payload, data.len);
+    data->len = sniffer->rx_ctrl.sig_len;
+    data->buf = (char *)malloc(data->len);
+    memcpy(data->buf, sniffer->payload, data->len);
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     if (xQueueSendFromISR(xQueueSniffer, &data, &xHigherPriorityTaskWoken) != pdTRUE) {
         // ets_printf("xQueueSniffer queue error\n");
@@ -83,7 +93,7 @@ void platform_awss_open_monitor(_IN_ platform_awss_recv_80211_frame_cb_t cb)
 {
     ALINK_PARAM_CHECK(cb == NULL);
     if (xQueueSniffer == NULL)
-        xQueueSniffer = xQueueCreate(1, sizeof(struct sniffer_data));
+        xQueueSniffer = xQueueCreate(3, sizeof(struct sniffer_data *));
     xTaskCreate(platform_sniffer_cb, "platform_sniffer_cb", 1024, NULL, 4, NULL);
     g_sniffer_cb = cb;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
@@ -99,10 +109,47 @@ void platform_awss_close_monitor(void)
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(0));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(NULL));
     g_sniffer_cb = NULL;
-    struct sniffer_data data;
-    xQueueSend(xQueueSniffer, &data, 0);
+    struct sniffer_data *data = NULL;
+    xQueueSend(xQueueSniffer, &data, portMAX_DELAY);
     vQueueDelete(xQueueSniffer);
 }
+
+
+#else
+
+
+static void IRAM_ATTR  wifi_sniffer_cb_(void *recv_buf, wifi_promiscuous_pkt_type_t type) {
+    char *buf = NULL;
+    uint16_t len = 0;
+    if (type == WIFI_PKT_CTRL) return;
+    wifi_promiscuous_pkt_t *sniffer = (wifi_promiscuous_pkt_t*)recv_buf;
+    buf = (char *)sniffer->payload;
+    len = sniffer->rx_ctrl.sig_len;
+    g_sniffer_cb(buf, len, AWSS_LINK_TYPE_NONE, 1);
+}
+
+//进入monitor模式, 并做好一些准备工作，如
+//设置wifi工作在默认信道6
+//若是linux平台，初始化socket句柄，绑定网卡，准备收包
+//若是rtos的平台，注册收包回调函数aws_80211_frame_handler()到系统接口
+void platform_awss_open_monitor(_IN_ platform_awss_recv_80211_frame_cb_t cb)
+{
+    g_sniffer_cb = cb;
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_channel(6, 0));
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(0));
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_cb_));
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(1));
+}
+
+//退出monitor模式，回到station模式, 其他资源回收
+void platform_awss_close_monitor(void)
+{
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(0));
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(NULL));
+}
+
+#endif
 
 
 int platform_wifi_get_rssi_dbm(void)

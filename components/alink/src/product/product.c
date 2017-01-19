@@ -24,98 +24,84 @@
  * INCLUDING THE WARRANTIES OF MERCHANTIBILITY, FITNESS FOR A PARTICULAR
  * PURPOSE, TITLE, AND NONINFRINGEMENT.
  */
-//#include <stdio.h>
-//#include <string.h>
 #include "product/product.h"
+static const char *TAG = "alink_product";
 
-// #define PASS_THROUGH
+static struct device_info g_device_info;
 
-//TODO: update these product info
-#define product_dev_name        "ALINKTEST"
-#ifdef PASS_THROUGH
-#define product_model		    "ALINKTEST_LIVING_LIGHT_SMARTLED_LUA"
-#define product_key             "bIjq3G1NcgjSfF9uSeK2"
-#define product_secret		    "W6tXrtzgQHGZqksvJLMdCPArmkecBAdcr2F5tjuF"
-#else
-#define product_model		    "ALINKTEST_LIVING_LIGHT_SMARTLED"
-#define product_key             "ljB6vqoLzmP8fGkE6pon"
-#define product_secret		    "YJJZjytOCXDhtQqip4EjWbhR95zTgI92RVjzjyZF"
-#endif
-#define product_debug_key       "dpZZEpm9eBfqzK7yVeLq"
-#define product_debug_secret    "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm"
+alink_err_t product_get(_OUT_ struct device_info *product_info)
+{
+    ALINK_PARAM_CHECK(product_info == NULL);
+    memcpy(product_info, &g_device_info, sizeof(struct device_info));
+    return ALINK_OK;
+}
 
-#define product_dev_sn          "12345678"
-#define product_dev_version     "1.0.0"
-#define product_dev_type        "LIGHT"
-#define product_dev_category    "LIVING"
-#define product_dev_manufacturer "ALINKTEST"
-#define product_dev_cid         "2D0044000F47333139373038" // ÐèÒªÎ¨Ò» 
-
-/* device info */
-#define product_dev_ DEV_CATEGORY "LIVING"
-#define DEV_TYPE "LIGHT"
-#define DEV_MANUFACTURE "ALINKTEST"
-
+alink_err_t product_set(_IN_ const struct device_info *product_info)
+{
+    ALINK_PARAM_CHECK(product_info == NULL);
+    memcpy(&g_device_info, product_info, sizeof(struct device_info));
+    return ALINK_OK;
+}
 
 char *product_get_name(char name_str[PRODUCT_NAME_LEN])
 {
-    return memcpy(name_str, product_dev_name, PRODUCT_NAME_LEN);
+    return memcpy(name_str, g_device_info.name, PRODUCT_NAME_LEN);
 }
 
 char *product_get_version(char ver_str[PRODUCT_VERSION_LEN])
 {
-    return memcpy(ver_str, product_dev_version, PRODUCT_VERSION_LEN);
+    return memcpy(ver_str, g_device_info.version, PRODUCT_VERSION_LEN);
 }
 
 char *product_get_model(char model_str[PRODUCT_MODEL_LEN])
 {
-    return memcpy(model_str, product_model, PRODUCT_MODEL_LEN);
+    return memcpy(model_str, g_device_info.model, PRODUCT_MODEL_LEN);
 }
 
 char *product_get_key(char key_str[PRODUCT_KEY_LEN])
 {
-    return memcpy(key_str, product_key, PRODUCT_KEY_LEN);
+    return memcpy(key_str, g_device_info.key, PRODUCT_KEY_LEN);
 }
 
 char *product_get_secret(char secret_str[PRODUCT_SECRET_LEN])
 {
-    return memcpy(secret_str, product_secret, PRODUCT_SECRET_LEN);
+    return memcpy(secret_str, g_device_info.secret, PRODUCT_SECRET_LEN);
 }
 
 char *product_get_debug_key(char key_str[PRODUCT_KEY_LEN])
 {
-    return memcpy(key_str, product_debug_key, PRODUCT_KEY_LEN);
+    return memcpy(key_str, g_device_info.key_sandbox, PRODUCT_KEY_LEN);
 }
 
 char *product_get_debug_secret(char secret_str[PRODUCT_SECRET_LEN])
 {
-    return memcpy(secret_str, product_debug_secret, PRODUCT_SECRET_LEN);
+    return memcpy(secret_str, g_device_info.secret_sandbox, PRODUCT_SECRET_LEN);
 }
 
 char *product_get_sn(char sn_str[PRODUCT_SN_LEN])
 {
-    return memcpy(sn_str, product_dev_sn, PRODUCT_SN_LEN);
+    return memcpy(sn_str, g_device_info.sn, PRODUCT_SN_LEN);
 }
 
 
 char *product_get_type(char type_str[STR_NAME_LEN])
 {
-    return memcpy(type_str, product_dev_type, STR_NAME_LEN);
+    return memcpy(type_str, g_device_info.type, STR_NAME_LEN);
 }
 
 char *product_get_category(char category_str[STR_NAME_LEN])
 {
-    return memcpy(category_str, product_dev_category, STR_NAME_LEN);
+    return memcpy(category_str, g_device_info.category, STR_NAME_LEN);
 }
 
 char *product_get_manufacturer(char manufacturer_str[STR_NAME_LEN])
 {
-    return memcpy(manufacturer_str, product_dev_manufacturer, STR_NAME_LEN);
+    return memcpy(manufacturer_str, g_device_info.manufacturer, STR_NAME_LEN);
 }
 
 char *product_get_cid(char cid_str[STR_CID_LEN])
 {
-	return memcpy(cid_str, product_dev_cid, STR_CID_LEN);
+    return memcpy(cid_str, g_device_info.cid, STR_CID_LEN);
 }
 
 
