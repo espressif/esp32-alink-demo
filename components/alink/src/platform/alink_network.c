@@ -67,7 +67,7 @@ void *platform_udp_server_create(_IN_ uint16_t port)
     ret = bind(server_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
     if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in))) {
         platform_udp_close((void *)server_socket);
-        ALINK_LOGE("[%s, %d]:socket bind", __func__, __LINE__);
+        ALINK_LOGE("socket bind");
         perror("socket bind");
         return NULL;
     }
@@ -104,7 +104,7 @@ void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
     ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     if (-1 == bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
-        ALINK_LOGE("[%s, %d]:socket bind, errno: %d", __func__, __LINE__, errno);
+        ALINK_LOGE("socket bind, errno: %d", errno);
         perror("socket bind");
         platform_udp_close((void *)sock);
         return NULL;
@@ -113,7 +113,7 @@ void *platform_udp_multicast_server_create(pplatform_netaddr_t netaddr)
     mreq.imr_multiaddr.s_addr = inet_addr(netaddr->host);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &mreq, sizeof(mreq)) < 0) {
-        ALINK_LOGE("[%s, %d]:setsockopt IP_ADD_MEMBERSHIP", __func__, __LINE__);
+        ALINK_LOGE("setsockopt IP_ADD_MEMBERSHIP");
         platform_udp_close((void *)sock);
         return NULL;
     }
@@ -196,13 +196,13 @@ void *platform_tcp_server_create(_IN_ uint16_t port)
     ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     if (-1 == bind(server_socket, (struct sockaddr *)&addr, sizeof(addr))) {
-        ALINK_LOGE("[%s, %d]:bind", __func__, __LINE__);
+        ALINK_LOGE("bind");
         platform_tcp_close((void *)server_socket);
         return NULL;
     }
 
     if (0 != listen(server_socket, SOMAXCONN)) {
-        ALINK_LOGE("[%s, %d]:listen", __func__, __LINE__);
+        ALINK_LOGE("listen");
         platform_tcp_close((void *)server_socket);
         return NULL;
     }
@@ -235,7 +235,7 @@ void *platform_tcp_client_connect(_IN_ pplatform_netaddr_t netaddr)
     ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     if (-1 == connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
-        ALINK_LOGE("[%s, %d]:connect", __func__, __LINE__);
+        ALINK_LOGE("connect");
         platform_tcp_close((void *)sock);
         return NULL;
     }
@@ -297,7 +297,7 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     if (NULL != read_fds) {
         pfd_read_set = malloc(sizeof(fd_set));
         if (NULL == pfd_read_set) {
-            ALINK_LOGE("[%s, %d]:pfd_read_set", __func__, __LINE__);
+            ALINK_LOGE("pfd_read_set");
             goto do_exit;
         }
 
@@ -316,7 +316,7 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     {
         pfd_write_set = malloc(sizeof(fd_set));
         if (NULL == pfd_write_set) {
-            ALINK_LOGE("[%s, %d]:pfd_write_set", __func__, __LINE__);
+            ALINK_LOGE("pfd_write_set");
             goto do_exit;
         }
 
@@ -354,9 +354,6 @@ do_exit:
     if (pfd_read_set) free(pfd_read_set);
     if (pfd_write_set) free(pfd_write_set);
 
-    if (ret_code < 0) {
-        ALINK_LOGW("select ret:%d, errno: %d", ret_code, errno);
-        perror("socket select");
-    }
+    ALINK_ERROR_CHECK(ret_code < 0, ret_code, "select ret:%d, errno: %d", ret_code, errno);
     return ret_code;
 }

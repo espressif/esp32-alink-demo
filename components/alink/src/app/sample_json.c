@@ -50,9 +50,7 @@ alink_up_cmd_ptr alink_up_cmd_malloc()
 {
     alink_up_cmd_ptr up_cmd = (alink_up_cmd_ptr)malloc(sizeof(alink_up_cmd));
     memset(up_cmd, 0, sizeof(alink_up_cmd));
-    // up_cmd->target = (char *)malloc(ALINK_DATA_LEN);
     up_cmd->param = (char *)malloc(ALINK_DATA_LEN);
-    // memset(up_cmd->target, 0, sizeof(ALINK_DATA_LEN));
     memset(up_cmd->param, 0, sizeof(ALINK_DATA_LEN));
     return up_cmd;
 }
@@ -60,7 +58,6 @@ alink_up_cmd_ptr alink_up_cmd_malloc()
 alink_err_t alink_up_cmd_free(_IN_ alink_up_cmd_ptr up_cmd)
 {
     ALINK_PARAM_CHECK(up_cmd == NULL);
-    // if (up_cmd->target) free(up_cmd->target);
     if (up_cmd->param) free(up_cmd->param);
     free(up_cmd);
     return ALINK_OK;
@@ -73,7 +70,6 @@ alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_p
     dest->resp_id     = src->resp_id;
     dest->emergency   = src->emergency;
     if (src->param) memcpy(dest->param, src->param, strlen(src->param) + 1);
-    // if (src->target) memcpy(dest->target, src->target, strlen(src->target) + 1);
     return ALINK_OK;
 }
 
@@ -142,11 +138,12 @@ static int alink_handler_systemstates_callback(void *dev_mac, void *sys_state)
 
 static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
 {
+    ALINK_LOGD("\nuuid:%s\nmethod:%d\nparam:%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
     alink_down_cmd_ptr q_data = alink_down_cmd_malloc();
     alink_down_cmd_memcpy(q_data, down_cmd);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
-        ALINK_LOGW("[%s, %d]:xQueueSend xQueueDownCmd is err", __FUNCTION__, __LINE__);
+        ALINK_LOGW("xQueueSend xQueueDownCmd is err");
     }
     return ALINK_OK;
 }
@@ -154,13 +151,12 @@ static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
 static int main_dev_get_device_status_callback(alink_down_cmd_ptr down_cmd)
 {
     /* do your job here */
-    ALINK_LOGI("%s %d ", __FUNCTION__, __LINE__);
-    ALINK_LOGI("%s %d\n%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
+    ALINK_LOGD("\nuuid:%s\nmethod:%d\nparam:%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
     alink_down_cmd_ptr q_data = alink_down_cmd_malloc();
     alink_down_cmd_memcpy(q_data, down_cmd);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
-        ALINK_LOGW("[%s, %d]:xQueueSend xQueueDownCmd is err", __FUNCTION__, __LINE__);
+        ALINK_LOGW("xQueueSend xQueueDownCmd is err");
     }
     return ALINK_OK;
     /*do your job end */
@@ -187,24 +183,24 @@ static int alink_device_post_data(alink_down_cmd_ptr down_cmd)
 
     ret = alink_post_device_data(up_cmd);
     if (ret == ALINK_ERR) {
-        ALINK_LOGI("post failed!");
+        ALINK_LOGW("post failed!");
         platform_msleep(2000);
         ret = ALINK_ERR;
         goto POST_DATA_EXIT;
     }
     ALINK_LOGI("dev post data success!");
+    ALINK_LOGD("\nparam:%s\n", up_cmd->param);
 
 POST_DATA_EXIT:
     if (up_cmd) alink_up_cmd_free(up_cmd);
     return ret;
 }
 
-
 alink_err_t alink_write(alink_up_cmd_ptr up_cmd, TickType_t ticks_to_wait)
 {
     ALINK_PARAM_CHECK(up_cmd == NULL);
     xSemaphoreTake(xSemWrite, portMAX_DELAY);
-    ALINK_LOGI("[%s, %d]:%p %d\n%s", __FUNCTION__, __LINE__, up_cmd->target, up_cmd->resp_id, up_cmd->param);
+    ALINK_LOGI("%p %d\n%s", up_cmd->target, up_cmd->resp_id, up_cmd->param);
     alink_err_t ret = ALINK_ERR;
     alink_up_cmd_ptr q_data = alink_up_cmd_malloc();
     alink_up_cmd_memcpy(q_data, up_cmd);
@@ -235,6 +231,52 @@ alink_err_t alink_read(alink_down_cmd_ptr down_cmd, TickType_t ticks_to_wait)
     alink_down_cmd_free(q_data);
     xSemaphoreGive(xSemRead);
     return ALINK_OK;
+}
+
+int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait)
+{
+    ALINK_PARAM_CHECK(up_cmd == NULL);
+    ALINK_PARAM_CHECK(size == 0 || size > ALINK_DATA_LEN);
+    size_t param_size = ALINK_DATA_LEN;
+    xSemaphoreTake(xSemWrite, portMAX_DELAY);
+    alink_err_t ret = ALINK_ERR;
+    alink_up_cmd_ptr q_data = alink_up_cmd_malloc();
+    if(size < param_size) param_size = size;
+
+    memcpy(q_data->param, up_cmd, param_size);
+    ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
+    if (ret == pdFALSE) {
+        ALINK_LOGE("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        xSemaphoreGive(xSemWrite);
+        return ALINK_ERR;
+    }
+    xSemaphoreGive(xSemWrite);
+    return ALINK_OK;
+}
+
+int esp_read(char *down_cmd, size_t size, TickType_t ticks_to_wait)
+{
+    ALINK_PARAM_CHECK(down_cmd == NULL);
+    ALINK_PARAM_CHECK(size == 0 || size > ALINK_DATA_LEN);
+    xSemaphoreTake(xSemRead, portMAX_DELAY);
+    alink_err_t ret = ALINK_ERR;
+    size_t param_size = 0;
+
+    alink_down_cmd_ptr q_data = NULL;
+    ret = xQueueReceive(xQueueDownCmd, &q_data, ticks_to_wait);
+    if (ret == pdFALSE) {
+        ALINK_LOGE("xQueueReceive xQueueDownCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        xSemaphoreGive(xSemRead);
+        return ALINK_ERR;
+    }
+
+    param_size = strlen(q_data->param) + 1;
+    if(size < param_size) param_size = size;
+
+    memcpy(down_cmd, q_data->param, param_size);
+    alink_down_cmd_free(q_data);
+    xSemaphoreGive(xSemRead);
+    return param_size;
 }
 
 static void alink_fill_deviceinfo(struct device_info *deviceinfo)
@@ -288,7 +330,6 @@ void alink_json(void *arg)
 
     while (sample_running) {
         alink_device_post_data(NULL);
-        // platform_msleep(500);
     }
 
     alink_end();

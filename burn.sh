@@ -1,11 +1,14 @@
 #!/bin/bash
 set -e
 export IDF_PATH=$(pwd)/esp-idf
+serial_port="/dev/ttyUSB0"
 echo "----------------------"
 echo "PLease Check IDF_PATH:" $IDF_PATH
+echo "PLease check serial port:" $serial_port
 echo "---------------------"
 
-make
+sudo chmod 777 $serial_port
+make erase_flash flash
 
 echo "------------------------------"
 echo "the esptool.py copy to bin "
@@ -19,4 +22,3 @@ cp ./build/alink.bin bin/
 cp ./build/bootloader/bootloader.bin bin
 cp  build/partitions_two_ota.bin bin
 xtensa-esp32-elf-objdump -S ./build/alink.elf > bin/alink.s
-

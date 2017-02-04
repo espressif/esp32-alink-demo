@@ -210,11 +210,11 @@ int platform_thread_create(_OUT_ void **thread,
     ALINK_LOGD("thread_create name: %s, stack_size: %d, priority:%d",
                name, stack_size * 2, DEFAULU_TASK_PRIOTY);
     ret = xTaskCreate((TaskFunction_t)start_routine, name, stack_size * 2, arg, DEFAULU_TASK_PRIOTY, thread);
-    ALINK_ERROR_CHECK(ret != pdTRUE, ALINK_ERR, "thread_create name: %s, stack_size: %d", name, stack_size * 2);
+    ALINK_ERROR_CHECK(ret != pdTRUE, ALINK_ERR, "thread_create name: %s, stack_size: %d, ret: %d", name, stack_size * 2, ret);
 
     int pos = get_task_name_location(name);
     if (pos == ALINK_ERR) {
-        ALINK_LOGE("[%s, %d]:get_task_name_location name: %s", __func__, __LINE__, name);
+        ALINK_LOGE("get_task_name_location name: %s", name);
         vTaskDelete(*thread);
     }
     set_task_name_handler(pos, *thread);

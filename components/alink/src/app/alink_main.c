@@ -50,8 +50,7 @@ alink_err_t alink_read_wifi_config(_OUT_ wifi_config_t *wifi_config)
     ret = nvs_get_blob(handle, "wifi_config", wifi_config, &length);
     nvs_close(handle);
     if (ret == ESP_ERR_NVS_NOT_FOUND) {
-        ALINK_LOGD("[%s, %d]:nvs_get_blob ret:%x,No data storage,the read data is empty\n",
-                   __func__, __LINE__ , ret);
+        ALINK_LOGD("nvs_get_blob ret:%x,No data storage,the read data is empty", ret);
         return ALINK_ERR;
     }
     ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_get_blob ret:%x", ret);
@@ -66,6 +65,7 @@ alink_err_t alink_write_wifi_config(_IN_ const wifi_config_t *wifi_config)
 
     ret = nvs_open("ALINK", NVS_READWRITE, &handle);
     ALINK_ERROR_CHECK(ret != ESP_OK, ret, "nvs_open ret:%x", ret);
+
     ret = nvs_set_blob(handle, "wifi_config", wifi_config, sizeof(wifi_config_t));
     nvs_commit(handle);
     nvs_close(handle);
@@ -161,7 +161,7 @@ static alink_err_t event_handler(void *ctx, system_event_t *event)
 static alink_err_t wifi_sta_connect_ap(wifi_config_t *wifi_config, TickType_t ticks_to_wait)
 {
     ALINK_PARAM_CHECK(wifi_config == NULL);
-    printf("WiFi SSID: %s, password: %s\n", wifi_config->ap.ssid, wifi_config->ap.password);
+    ALINK_LOGI("WiFi SSID: %s, password: %s", wifi_config->ap.ssid, wifi_config->ap.password);
 
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, wifi_config) );
@@ -192,7 +192,7 @@ alink_err_t alink_connect_ap()
             goto EXIT;
     }
 
-    printf("********ENTER SOFTAP MODE******\n");
+    ALINK_LOGI("********ENTER SOFTAP MODE******");
     ret = aws_softap_init(&wifi_config);
     if (ret == ALINK_OK) {
         if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)

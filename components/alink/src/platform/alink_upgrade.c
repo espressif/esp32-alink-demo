@@ -41,7 +41,7 @@ void platform_firmware_upgrade_start(void)
     esp_err_t err;
     const esp_partition_t *esp_current_partition = esp_ota_get_boot_partition();
     if (esp_current_partition->type != ESP_PARTITION_TYPE_APP) {
-        ALINK_LOGE("Error： esp_current_partition->type != ESP_PARTITION_TYPE_APP");
+        ALINK_LOGE("esp_current_partition->type != ESP_PARTITION_TYPE_APP");
         return;
     }
 

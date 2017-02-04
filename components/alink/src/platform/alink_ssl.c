@@ -25,8 +25,8 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
     SSL *ssl;
     int socket = (int)tcp_fd;
     int ret = -1;
-    ALINK_LOGD("[%s, %d]:tcp_fd: %d, server_cert: %p, server_cert_len: %d",
-             __func__, __LINE__, socket, server_cert, server_cert_len);
+    ALINK_LOGD("tcp_fd: %d, server_cert: %p, server_cert_len: %d",
+               socket, server_cert, server_cert_len);
 
 
     ctx = SSL_CTX_new(TLSv1_1_client_method());
@@ -68,7 +68,7 @@ int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
     ALINK_PARAM_CHECK(buffer == NULL);
     int ret = -1;
     ret = SSL_read((SSL*)ssl, buffer, length);
-    if (ret <= 0) ALINK_LOGE("[%s, %d]:SSL_read:%d", __func__, __LINE__, ret);
+    if (ret <= 0) ALINK_LOGE("SSL_read:%d", ret);
     return ret;
 }
 
@@ -79,8 +79,7 @@ int platform_ssl_close(_IN_ void *ssl)
     ret = SSL_shutdown((SSL *)ssl);
 
     if (ret != pdTRUE) {
-        ALINK_LOGW("[%s, %d]:SSL_shutdown: ret:%d, ssl: %p",
-                 __func__, __LINE__, ret, ssl);
+        ALINK_LOGW("SSL_shutdown: ret:%d, ssl: %p", ret, ssl);
     }
 
     int fd = SSL_get_fd((SSL *)ssl);
@@ -96,7 +95,7 @@ int platform_ssl_close(_IN_ void *ssl)
     }
 
     if (fd >= 0) close(fd);
-    else ALINK_LOGE("[%s, %d]:SSL_get_fd:%d", __func__, __LINE__, fd);
+    else ALINK_LOGE("SSL_get_fd:%d", fd);
 
     return (ret == pdTRUE) ? ALINK_OK : ALINK_ERR;
 }

@@ -23,6 +23,9 @@
 
 #include "product.h"
 
+static const char *TAG = "app_main";
+static SemaphoreHandle_t xSemWrite = NULL;
+
 void esp_alink_init(_IN_ struct device_info *product);
 
 #define ALINK_DATA_LEN 512
@@ -36,6 +39,9 @@ alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_p
 
 alink_err_t alink_write(alink_up_cmd_ptr up_cmd, TickType_t ticks_to_wait);
 alink_err_t alink_read(alink_down_cmd_ptr down_cmd, TickType_t ticks_to_wait);
+int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait);
+int esp_read(char *down_cmd, size_t size, TickType_t ticks_to_wait);
+
 
 /*do your job here*/
 struct virtual_dev {
@@ -56,7 +62,7 @@ const char *main_dev_params =
     "{\"OnOff_Power\": { \"value\": \"%d\" }, \"Color_Temperature\": { \"value\": \"%d\" }, \"Light_Brightness\": { \"value\": \"%d\" }, \"TimeDelay_PowerOff\": { \"value\": \"%d\"}, \"WorkMode_MasterLight\": { \"value\": \"%d\"}}";
 
 
-static alink_err_t read_flag = ALINK_FALSE;
+#if 0
 void read_task_test(void *arg)
 {
     alink_down_cmd_ptr down_cmd = alink_down_cmd_malloc();
@@ -95,31 +101,89 @@ void read_task_test(void *arg)
                 }
             }
         }
-        read_flag = ALINK_TRUE;
+        xSemaphoreGive(xSemWrite);
     }
-    free(down_cmd);
+    alink_down_cmd_free(down_cmd);
     vTaskDelete(NULL);
 }
-
 
 void write_task_test(void *arg)
 {
     alink_up_cmd_ptr up_cmd = alink_up_cmd_malloc();
     for (;;) {
-        if (read_flag == ALINK_FALSE) {
-            platform_msleep(500);
-            continue;
-        }
+        xSemaphoreTake(xSemWrite, portMAX_DELAY);
         memset(up_cmd->param, 0, ALINK_DATA_LEN);
         sprintf(up_cmd->param, main_dev_params, virtual_device.power,
                 virtual_device.temp_value, virtual_device.light_value,
                 virtual_device.time_delay, virtual_device.work_mode);
         alink_write(up_cmd, 100 / portTICK_PERIOD_MS);
-        read_flag = ALINK_FALSE;
     }
     alink_up_cmd_free(up_cmd);
     vTaskDelete(NULL);
 }
+#else
+
+void read_task_test(void *arg)
+{
+    char *down_cmd = (char *)malloc(ALINK_DATA_LEN);
+    for (;;) {
+        esp_read(down_cmd, ALINK_DATA_LEN, portMAX_DELAY);
+
+        int attrLen = 0, valueLen = 0, value = 0, i = 0;
+        char *valueStr = NULL, *attrStr = NULL;
+        for (i = 0; i < 5; i++) {
+            attrStr = alink_JsonGetValueByName(down_cmd, strlen(down_cmd), device_attr[i], &attrLen, 0);
+            valueStr = alink_JsonGetValueByName(attrStr, attrLen, "value", &valueLen, 0);
+
+            if (valueStr && valueLen > 0) {
+                char lastChar = *(valueStr + valueLen);
+                *(valueStr + valueLen) = 0;
+                value = atoi(valueStr);
+                *(valueStr + valueLen) = lastChar;
+                switch (i) {
+                case 0:
+                    virtual_device.power = value;
+                    break;
+                case 1:
+                    virtual_device.temp_value = value;
+                    break;
+                case 2:
+                    virtual_device.light_value = value;
+                    break;
+                case 3:
+                    virtual_device.time_delay = value;
+                    break;
+                case 4:
+                    virtual_device.work_mode = value;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        xSemaphoreGive(xSemWrite);
+    }
+    free(down_cmd);
+    vTaskDelete(NULL);
+}
+
+void write_task_test(void *arg)
+{
+    char *up_cmd = (char *)malloc(ALINK_DATA_LEN);
+    for (;;) {
+        xSemaphoreTake(xSemWrite, portMAX_DELAY);
+        memset(up_cmd, 0, ALINK_DATA_LEN);
+        sprintf(up_cmd, main_dev_params, virtual_device.power,
+                virtual_device.temp_value, virtual_device.light_value,
+                virtual_device.time_delay, virtual_device.work_mode);
+        esp_write(up_cmd, ALINK_DATA_LEN, 100 / portTICK_PERIOD_MS);
+        // platform_msleep(500);
+    }
+    free(up_cmd);
+    vTaskDelete(NULL);
+}
+#endif
+
 
 
 /******************************************************************************
@@ -164,9 +228,9 @@ void app_main()
     };
 
     esp_alink_init(&product_info);
+    xSemWrite = xSemaphoreCreateBinary();
     xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 9, NULL);
-    // if(product) free(product);
     // xTaskCreate(free_heap_task, "free_heap_task", 1024, NULL, 3, NULL);
     printf("free_heap3:%u\n", esp_get_free_heap_size());
 }
