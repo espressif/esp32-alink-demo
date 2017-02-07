@@ -11,7 +11,7 @@
 
 #include "platform/platform.h"
 #include "tcpip_adapter.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 
 #define SOMAXCONN 5
 static const char *TAG = "alink_network";

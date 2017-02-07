@@ -27,13 +27,13 @@
 #include "aws_smartconfig.h"
 #include "aws_softap.h"
 #include "esp_partition.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 static const char *TAG = "alink_main";
 
 static SemaphoreHandle_t xSemConnet = NULL;
 static SemaphoreHandle_t xSemAinkInitFinsh = NULL;
 void alink_passthroug(void *arg);
-void alink_json(void *arg);
+void alink_trans_init(void *arg);
 void alink_key_init(uint32_t key_gpio_pin);
 alink_err_t alink_key_scan(TickType_t ticks_to_wait);
 
@@ -218,10 +218,8 @@ void esp_alink_init(_IN_ const struct device_info *product_info)
 {
     alink_key_init(ALINK_RESET_KEY_IO);
     xTaskCreate(factory_reset, "factory_reset", 1024 * 4, NULL, 10, NULL);
-
     product_set(product_info);
 
     alink_connect_ap();
-    xTaskCreate(alink_json, "alink_json", 1024 * 4, NULL, 9, NULL);
-    // xTaskCreate(alink_passthroug, "alink_passthroug", 1024 * 4, NULL, 9, NULL);
+    xTaskCreate(alink_trans_init, "alink_trans_init", 1024 * 4, NULL, 9, NULL);
 }

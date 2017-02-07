@@ -26,7 +26,7 @@
 #include "lwip/sys.h"
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 
 #define BUFFSIZE 1024
 

@@ -10,7 +10,7 @@ extern "C"
 
 #include "platform/platform.h"
 #include "alink_export.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 
 /** @defgroup group_product group_product
  *  @{

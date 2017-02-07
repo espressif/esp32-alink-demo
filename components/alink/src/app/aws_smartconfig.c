@@ -11,7 +11,7 @@
 #include "string.h"
 #include "platform.h"
 #include "product.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 static const char *TAG = "alink_smartconfig";
 
 alink_err_t aws_smartconfig_init(_OUT_ wifi_config_t *wifi_config)

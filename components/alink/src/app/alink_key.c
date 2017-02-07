@@ -13,7 +13,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 
 static const char *TAG = "alink_key";
 #define ESP_INTR_FLAG_DEFAULT 0

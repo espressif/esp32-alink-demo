@@ -12,7 +12,7 @@
 #include "lwip/netdb.h"
 
 #include "platform/platform.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 
 static SSL_CTX *ctx = NULL;
 static const char *TAG = "alink_ssl";
@@ -57,8 +57,8 @@ int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
 
     alink_err_t ret;
     ret = SSL_write((SSL *)ssl, buffer, length);
-    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_write, ret:%d", ret);
 
+    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_write, ret:%d", ret);
     return ret;
 }
 
@@ -68,7 +68,7 @@ int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
     ALINK_PARAM_CHECK(buffer == NULL);
     int ret = -1;
     ret = SSL_read((SSL*)ssl, buffer, length);
-    if (ret <= 0) ALINK_LOGE("SSL_read:%d", ret);
+    if (ret <= 0) ALINK_LOGE("SSL_read, ret:%d", ret);
     return ret;
 }
 

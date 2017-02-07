@@ -10,7 +10,7 @@
 
 #include "platform.h"
 #include "alink_export.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 
 static platform_awss_recv_80211_frame_cb_t g_sniffer_cb = NULL;
 static const char *TAG = "alink_wifi";
@@ -34,14 +34,6 @@ void platform_awss_switch_channel(char primary_channel,
     ESP_ERROR_CHECK(esp_wifi_set_channel(primary_channel, secondary_channel));
     //ret = system(buf);
 }
-
-
-struct sniffer_data
-{
-    uint16_t len;
-    char *buf;
-};
-
 
 static void IRAM_ATTR  wifi_sniffer_cb_(void *recv_buf, wifi_promiscuous_pkt_type_t type) {
     char *buf = NULL;

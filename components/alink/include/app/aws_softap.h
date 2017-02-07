@@ -1,6 +1,6 @@
 #ifndef __AWS_CONNECT_H__
 #define __AWS_CONNECT_H__
-#include "alink_user_config.h"
+#include "esp_alink.h"
 #define SOFTAP_GATEWAY_IP       "172.31.254.250"
 #define SOFTAP_TCP_SERVER_PORT      (65125)
 

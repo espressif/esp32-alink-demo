@@ -22,26 +22,10 @@
 #include "nvs_flash.h"
 
 #include "product.h"
-
+#include "esp_alink.h"
+#ifndef ALINK_PASSTHROUG
 static const char *TAG = "app_main";
 static SemaphoreHandle_t xSemWrite = NULL;
-
-void esp_alink_init(_IN_ struct device_info *product);
-
-#define ALINK_DATA_LEN 512
-alink_up_cmd_ptr alink_up_cmd_malloc();
-alink_err_t alink_up_cmd_free(_IN_ alink_up_cmd_ptr up_cmd);
-alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src);
-
-alink_down_cmd_ptr alink_down_cmd_malloc();
-alink_err_t alink_down_cmd_free(_IN_ alink_down_cmd_ptr down_cmd);
-alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src);
-
-alink_err_t alink_write(alink_up_cmd_ptr up_cmd, TickType_t ticks_to_wait);
-alink_err_t alink_read(alink_down_cmd_ptr down_cmd, TickType_t ticks_to_wait);
-int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait);
-int esp_read(char *down_cmd, size_t size, TickType_t ticks_to_wait);
-
 
 /*do your job here*/
 struct virtual_dev {
@@ -63,6 +47,13 @@ const char *main_dev_params =
 
 
 #if 0
+alink_up_cmd_ptr alink_up_cmd_malloc();
+alink_err_t alink_up_cmd_free(_IN_ alink_up_cmd_ptr up_cmd);
+alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src);
+
+alink_down_cmd_ptr alink_down_cmd_malloc();
+alink_err_t alink_down_cmd_free(_IN_ alink_down_cmd_ptr down_cmd);
+alink_err_t alink_down_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src);
 void read_task_test(void *arg)
 {
     alink_down_cmd_ptr down_cmd = alink_down_cmd_malloc();
@@ -192,19 +183,20 @@ void write_task_test(void *arg)
  * Parameters   : none
  * Returns      : none
 *******************************************************************************/
+void mem_debug_malloc_show(void);
 static void free_heap_task(void *arg)
 {
     while (1) {
-        ets_printf("free heap size: %d\n", esp_get_free_heap_size());
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        mem_debug_malloc_show();
+        ALINK_LOGI("free heap size: %d\n", esp_get_free_heap_size());
+        vTaskDelay(10000 / portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
 }
 
 void app_main()
 {
-    ets_printf("==== esp32_alink sdk version: 1.0.5  ====\n");
-    ets_printf("free_heap :%u\n", esp_get_free_heap_size());
+    ALINK_LOGI("mode: json, free_heap: %u\n", esp_get_free_heap_size());
     nvs_flash_init();
     tcpip_adapter_init();
     ESP_ERROR_CHECK( esp_event_loop_init(NULL, NULL) );
@@ -228,10 +220,11 @@ void app_main()
     };
 
     esp_alink_init(&product_info);
+    ALINK_LOGI("esp32 alink version: %s", product_info.version);
     xSemWrite = xSemaphoreCreateBinary();
     xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 9, NULL);
-    // xTaskCreate(free_heap_task, "free_heap_task", 1024, NULL, 3, NULL);
+    // xTaskCreate(free_heap_task, "free_heap_task", 1024 * 8, NULL, 3, NULL);
     printf("free_heap3:%u\n", esp_get_free_heap_size());
 }
-
+#endif

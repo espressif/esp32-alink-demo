@@ -61,7 +61,7 @@
 #include "product.h"
 #include "aws_softap.h"
 
-#include "alink_user_config.h"
+#include "esp_alink.h"
 static const char *TAG = "alink_softap";
 
 /* json info parser */

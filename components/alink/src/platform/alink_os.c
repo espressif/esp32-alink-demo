@@ -13,7 +13,7 @@
 #include "nvs_flash.h"
 
 #include "platform.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
 
 
 #define PLATFORM_TABLE_CONTENT_CNT(table) (sizeof(table)/sizeof(table[0]))

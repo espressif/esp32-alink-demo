@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2014-2015 Alibaba Group. All rights reserved.
  *
@@ -35,14 +36,15 @@
 #include "platform/platform.h"
 #include "product/product.h"
 #include "alink_export.h"
-#include "alink_user_config.h"
+#include "esp_alink.h"
+
+#ifndef ALINK_PASSTHROUG
 
 static const char *TAG = "alink_json";
 static xQueueHandle xQueueUpCmd = NULL;
 static xQueueHandle xQueueDownCmd = NULL;
 static SemaphoreHandle_t xSemWrite = NULL;
 static SemaphoreHandle_t xSemRead = NULL;
-#define ALINK_DATA_LEN 512
 
 void *alink_sample_mutex;
 
@@ -196,6 +198,65 @@ POST_DATA_EXIT:
     return ret;
 }
 
+static void alink_fill_deviceinfo(struct device_info *deviceinfo)
+{   /*fill main device info here */
+    product_get_name(deviceinfo->name);
+    product_get_sn(deviceinfo->sn);  // Product registration if it is sn, then need to protect the only sn
+    product_get_key(deviceinfo->key);
+    product_get_model(deviceinfo->model);
+    product_get_secret(deviceinfo->secret);
+    product_get_type(deviceinfo->type);
+    product_get_version(deviceinfo->version);
+    product_get_category(deviceinfo->category);
+    product_get_manufacturer(deviceinfo->manufacturer);
+    product_get_debug_key(deviceinfo->key_sandbox);
+    product_get_debug_secret(deviceinfo->secret_sandbox);
+    platform_wifi_get_mac(deviceinfo->mac);//Product registration mac only or sn only unified uppercase
+    product_get_cid(deviceinfo->cid); // Use the interface to obtain a unique chipid, anti-counterfeit device
+    ALINK_LOGI("DEV_MODEL:%s", deviceinfo->model);
+}
+
+static int sample_running = ALINK_TRUE;
+void alink_trans_init(void *arg)
+{
+    struct device_info *main_dev;
+    main_dev = platform_malloc(sizeof(struct device_info));
+    alink_sample_mutex = platform_mutex_init();
+    xQueueUpCmd = xQueueCreate(3, sizeof(alink_up_cmd_ptr));
+    xQueueDownCmd = xQueueCreate(3, sizeof(alink_down_cmd_ptr));
+    xSemWrite = xSemaphoreCreateMutex();
+    xSemRead = xSemaphoreCreateMutex();
+
+    memset(main_dev, 0, sizeof(struct device_info));
+    alink_fill_deviceinfo(main_dev);
+    alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
+                       ALINK_LL_ERROR | ALINK_LL_DUMP);
+    // alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_ERROR | ALINK_LL_DUMP);
+    main_dev->sys_callback[ALINK_FUNC_SERVER_STATUS] = alink_handler_systemstates_callback;
+
+
+    /*start alink-sdk */
+
+    main_dev->dev_callback[ACB_GET_DEVICE_STATUS] = main_dev_get_device_status_callback;
+    main_dev->dev_callback[ACB_SET_DEVICE_STATUS] = main_dev_set_device_status_callback;
+    alink_start(main_dev);  /*register main device here */
+
+    platform_free(main_dev);
+
+    ALINK_LOGI("wait main device login");
+    /*wait main device login, -1 means wait forever */
+    alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
+
+    while (sample_running) {
+        alink_device_post_data(NULL);
+    }
+
+    alink_end();
+    platform_mutex_destroy(alink_sample_mutex);
+    vTaskDelete(NULL);
+}
+
+
 alink_err_t alink_write(alink_up_cmd_ptr up_cmd, TickType_t ticks_to_wait)
 {
     ALINK_PARAM_CHECK(up_cmd == NULL);
@@ -278,61 +339,4 @@ int esp_read(char *down_cmd, size_t size, TickType_t ticks_to_wait)
     xSemaphoreGive(xSemRead);
     return param_size;
 }
-
-static void alink_fill_deviceinfo(struct device_info *deviceinfo)
-{   /*fill main device info here */
-    product_get_name(deviceinfo->name);
-    product_get_sn(deviceinfo->sn);  // Product registration if it is sn, then need to protect the only sn
-    product_get_key(deviceinfo->key);
-    product_get_model(deviceinfo->model);
-    product_get_secret(deviceinfo->secret);
-    product_get_type(deviceinfo->type);
-    product_get_version(deviceinfo->version);
-    product_get_category(deviceinfo->category);
-    product_get_manufacturer(deviceinfo->manufacturer);
-    product_get_debug_key(deviceinfo->key_sandbox);
-    product_get_debug_secret(deviceinfo->secret_sandbox);
-    platform_wifi_get_mac(deviceinfo->mac);//Product registration mac only or sn only unified uppercase
-    product_get_cid(deviceinfo->cid); // Use the interface to obtain a unique chipid, anti-counterfeit device
-    ALINK_LOGI("DEV_MODEL:%s", deviceinfo->model);
-}
-
-static int sample_running = ALINK_TRUE;
-void alink_json(void *arg)
-{
-    struct device_info *main_dev;
-    main_dev = platform_malloc(sizeof(struct device_info));
-    alink_sample_mutex = platform_mutex_init();
-    xQueueUpCmd = xQueueCreate(3, sizeof(alink_up_cmd_ptr));
-    xQueueDownCmd = xQueueCreate(3, sizeof(alink_down_cmd_ptr));
-    xSemWrite = xSemaphoreCreateMutex();
-    xSemRead = xSemaphoreCreateMutex();
-
-    memset(main_dev, 0, sizeof(struct device_info));
-    alink_fill_deviceinfo(main_dev);
-    alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
-                       ALINK_LL_ERROR | ALINK_LL_DUMP);
-    // alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_ERROR | ALINK_LL_DUMP);
-    main_dev->sys_callback[ALINK_FUNC_SERVER_STATUS] = alink_handler_systemstates_callback;
-
-
-    /*start alink-sdk */
-
-    main_dev->dev_callback[ACB_GET_DEVICE_STATUS] = main_dev_get_device_status_callback;
-    main_dev->dev_callback[ACB_SET_DEVICE_STATUS] = main_dev_set_device_status_callback;
-    alink_start(main_dev);  /*register main device here */
-
-    platform_free(main_dev);
-
-    ALINK_LOGI("wait main device login");
-    /*wait main device login, -1 means wait forever */
-    alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
-
-    while (sample_running) {
-        alink_device_post_data(NULL);
-    }
-
-    alink_end();
-    platform_mutex_destroy(alink_sample_mutex);
-    vTaskDelete(NULL);
-}
+#endif
