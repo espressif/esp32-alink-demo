@@ -24,18 +24,19 @@
 #include "string.h"
 #include "platform.h"
 #include "product.h"
-#include "aws_smartconfig.h"
-#include "aws_softap.h"
 #include "esp_partition.h"
 #include "esp_alink.h"
 static const char *TAG = "alink_main";
 
 static SemaphoreHandle_t xSemConnet = NULL;
 static SemaphoreHandle_t xSemAinkInitFinsh = NULL;
-void alink_passthroug(void *arg);
-void alink_trans_init(void *arg);
-void alink_key_init(uint32_t key_gpio_pin);
-alink_err_t alink_key_scan(TickType_t ticks_to_wait);
+
+extern void alink_trans_init(void *arg);
+extern void alink_key_init(uint32_t key_gpio_pin);
+extern alink_err_t alink_key_scan(TickType_t ticks_to_wait);
+
+extern alink_err_t aws_softap_init(_OUT_ wifi_config_t * wifi_config);
+extern alink_err_t aws_smartconfig_init(_OUT_ wifi_config_t *wifi_config);
 
 alink_err_t alink_read_wifi_config(_OUT_ wifi_config_t *wifi_config)
 {

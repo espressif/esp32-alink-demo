@@ -7,49 +7,49 @@
 4. 透传、非透传(由于esp32的性能十分强劲，建议使用非透传的模式)
 
 # 文件结构
-esp-alink
-├── bin                                     // 存放所有生成的bin文件
-├── build                                   // 存放所有生成的.o,.d文件
-├── burn.sh                                 // ubuntu下烧录脚本
-├── components
-│   ├── alink
-│   │   ├── component.mk
-│   │   ├── include
-│   │   │   ├── app
-│   │   │   │   ├── alink_export.h         // 用户使用的接口描述
-│   │   │   │   ├── alink_export_rawdata.h // 用户使用的接口描述
-│   │   │   │   ├── alink_json.h
-│   │   │   │   ├── alink_user_config.h    // 用户使用的接口描述
-│   │   │   │   ├── aws_smartconfig.h
-│   │   │   │   └── aws_softap.h
-│   │   │   ├── platform
-│   │   │   └── product
-│   │   ├── lib
-│   │   └── src
-│   │       ├── app
-│   │       │   ├── alink_key.c             // 出厂设置按键实现
-│   │       │   ├── alink_main.c            // alink程序入口
-│   │       │   ├── aws_smartconfig.c       // 一键配网
-│   │       │   ├── aws_softap.c            // softap配网
-│   │       │   ├── sample.c                // alink透传模式的封装
-│   │       │   └── sample_json.c           // alink非透传模式的封装
-│   │       ├── platform
-│   │       └── product
-│   └── test
-│       ├── log.c
-│       ├── tmp.c
-│       ├── tree.md
-│       └── udp_server_test.c
-├── esp-idf                                 // esp32 SDK
-├── gen_misch.sh                            // 编译脚本
-├── main
-│   ├── app_main.c                          // 一个简单的alink sample 程序
-│   └── component.mk
-├── Makefile
-├── path_config.sh                          // SDK路径配置脚本
-├── README.md
-├── sdkconfig
-└── sdkconfig.old
+    esp-alink
+    ├── bin                                     // 存放所有生成的bin文件
+    ├── build                                   // 存放所有生成的.o,.d文件
+    ├── burn.sh                                 // ubuntu下烧录脚本
+    ├── components
+    │   ├── alink
+    │   │   ├── component.mk
+    │   │   ├── include
+    │   │   │   ├── app
+    │   │   │   │   ├── alink_export.h         // 用户使用的接口描述
+    │   │   │   │   ├── alink_export_rawdata.h // 用户使用的接口描述
+    │   │   │   │   ├── alink_json.h
+    │   │   │   │   ├── alink_user_config.h    // 用户使用的接口描述
+    │   │   │   │   ├── aws_smartconfig.h
+    │   │   │   │   └── aws_softap.h
+    │   │   │   ├── platform
+    │   │   │   └── product
+    │   │   ├── lib
+    │   │   └── src
+    │   │       ├── app
+    │   │       │   ├── alink_key.c             // 出厂设置按键实现
+    │   │       │   ├── alink_main.c            // alink程序入口
+    │   │       │   ├── aws_smartconfig.c       // 一键配网
+    │   │       │   ├── aws_softap.c            // softap配网
+    │   │       │   ├── sample.c                // alink透传模式的封装
+    │   │       │   └── sample_json.c           // alink非透传模式的封装
+    │   │       ├── platform
+    │   │       └── product
+    │   └── test
+    │       ├── log.c
+    │       ├── tmp.c
+    │       ├── tree.md
+    │       └── udp_server_test.c
+    ├── esp-idf                                 // esp32 SDK
+    ├── gen_misch.sh                            // 编译脚本
+    ├── main
+    │   ├── app_main.c                          // 一个简单的alink sample 程序
+    │   └── component.mk
+    ├── Makefile
+    ├── path_config.sh                          // SDK路径配置脚本
+    ├── README.md
+    ├── sdkconfig
+    └── sdkconfig.old
 
 # 知识储备
 1. 熟悉esp32_idf的使用，详见：http://esp-idf.readthedocs.io/en/latest/?badge=latest

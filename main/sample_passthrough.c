@@ -20,6 +20,7 @@
 
 #include "nvs.h"
 #include "nvs_flash.h"
+
 #include "product.h"
 #include "esp_alink.h"
 #ifdef ALINK_PASSTHROUGH
@@ -79,15 +80,6 @@ void write_task_test(void *arg)
  * Parameters   : none
  * Returns      : none
 *******************************************************************************/
-static void free_heap_task(void *arg)
-{
-    while (1) {
-        ALINK_LOGI("free heap size: %d\n", esp_get_free_heap_size());
-        vTaskDelay(1000 / portTICK_RATE_MS);
-    }
-    vTaskDelete(NULL);
-}
-
 void app_main()
 {
     ALINK_LOGI("mode: passthrough, free_heap :%u\n", esp_get_free_heap_size());
@@ -119,7 +111,6 @@ void app_main()
     xSemaphoreGive(xSemWrite);
     xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 9, NULL);
-    // xTaskCreate(free_heap_task, "free_heap_task", 1024, NULL, 3, NULL);
     printf("free_heap3:%u\n", esp_get_free_heap_size());
 }
 

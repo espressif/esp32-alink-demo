@@ -1,4 +1,3 @@
-#if 1
 /*
  * Copyright (c) 2014-2015 Alibaba Group. All rights reserved.
  *
@@ -59,11 +58,11 @@
 #include "alink_export_rawdata.h"
 #include "platform.h"
 #include "product.h"
-#include "aws_softap.h"
 
 #include "esp_alink.h"
 static const char *TAG = "alink_softap";
-
+#define SOFTAP_GATEWAY_IP       "172.31.254.250"
+#define SOFTAP_TCP_SERVER_PORT      (65125)
 /* json info parser */
 static int get_ssid_and_passwd(_IN_ char *msg, _OUT_ wifi_config_t  *wifi_config)
 {
@@ -264,5 +263,3 @@ alink_err_t aws_softap_init(_OUT_ wifi_config_t * wifi_config)
     aws_softap_exit();
     return ALINK_OK;
 }
-
-#endif
