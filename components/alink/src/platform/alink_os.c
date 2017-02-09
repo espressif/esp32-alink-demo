@@ -45,16 +45,14 @@ task_infor_t task_infor[] = {
     {NULL, NULL}
 };
 
+// int platform_printf(const char *fmt, ...) __attribute__((alias("printf")));
 void platform_printf(const char *fmt, ...)
 {
     va_list args;
-
     va_start(args, fmt);
     vprintf(fmt, args);
     va_end(args);
-
     fflush(stdout);
-    // ets_printf(fmt, ##__VA_ARGS__);
 }
 
 /************************ memory manage ************************/
@@ -71,6 +69,7 @@ void platform_free(_IN_ void *ptr)
     free(ptr);
     ptr = NULL;
 }
+
 
 /************************ mutex manage ************************/
 
@@ -140,7 +139,7 @@ void platform_msleep(_IN_ uint32_t ms)
 
 uint32_t platform_get_time_ms(void)
 {
-    return system_get_time() / 1000;
+    return xTaskGetTickCount() / portTICK_RATE_MS;
 }
 
 int platform_thread_get_stack_size(_IN_ const char *thread_name)

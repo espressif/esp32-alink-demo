@@ -12,52 +12,45 @@
     ├── build                                   // 存放所有生成的.o,.d文件
     ├── burn.sh                                 // ubuntu下烧录脚本
     ├── components
-    │   ├── alink
-    │   │   ├── component.mk
-    │   │   ├── include
-    │   │   │   ├── app
-    │   │   │   │   ├── alink_export.h         // 用户使用的接口描述
-    │   │   │   │   ├── alink_export_rawdata.h // 用户使用的接口描述
-    │   │   │   │   ├── alink_json.h
-    │   │   │   │   ├── alink_user_config.h    // 用户使用的接口描述
-    │   │   │   │   ├── aws_smartconfig.h
-    │   │   │   │   └── aws_softap.h
-    │   │   │   ├── platform
-    │   │   │   └── product
-    │   │   ├── lib
-    │   │   └── src
-    │   │       ├── app
-    │   │       │   ├── alink_key.c             // 出厂设置按键实现
-    │   │       │   ├── alink_main.c            // alink程序入口
-    │   │       │   ├── aws_smartconfig.c       // 一键配网
-    │   │       │   ├── aws_softap.c            // softap配网
-    │   │       │   ├── sample.c                // alink透传模式的封装
-    │   │       │   └── sample_json.c           // alink非透传模式的封装
-    │   │       ├── platform
-    │   │       └── product
-    │   └── test
-    │       ├── log.c
-    │       ├── tmp.c
-    │       ├── tree.md
-    │       └── udp_server_test.c
+    │   └── alink
+    │       ├── component.mk
+    │       ├── include
+    │       │   ├── app
+    │       │   │   ├── alink_export.h          // json数据传输方式API
+    │       │   │   ├── alink_export_rawdata.h  // 透传数据传输方式API
+    │       │   │   └── esp_alink.h             // 常用API
+    │       │   ├── platform
+    │       │   │   └── platform.h
+    │       │   └── product
+    │       │       └── product.h
+    │       ├── Kconfig
+    │       ├── lib                             // alink相关的库文件
+    │       └── src
+    │           ├── app
+    │           │   ├── alink_json.c            // json数据传输的封装
+    │           │   ├── alink_key.c             // 出厂设置按键实现
+    │           │   ├── alink_main.c            // alink程序入口
+    │           │   ├── alink_passthrough.c     // 透传数据传输的封装
+    │           │   ├── aws_smartconfig.c       // 一键配网
+    │           │   └── aws_softap.c            // softap配网
+    │           ├── platform                    // 对接阿里智能相关接口
+    │           └── product
+    │               └── product.c
     ├── esp-idf                                 // esp32 SDK
     ├── gen_misch.sh                            // 编译脚本
     ├── main
-    │   ├── app_main.c                          // 一个简单的alink sample 程序
-    │   └── component.mk
+    │   ├── component.mk
+    │   ├── sample_json.c                       // json数据传输示例
+    │   └── sample_passthrough.c                // 透传数据传输示例
     ├── Makefile
-    ├── path_config.sh                          // SDK路径配置脚本
+    ├── path_config.sh
     ├── README.md
     ├── sdkconfig
     └── sdkconfig.old
 
 # 知识储备
-1. 熟悉esp32_idf的使用，详见：http://esp-idf.readthedocs.io/en/latest/?badge=latest
-2. 了解阿里智能相关知识，详见：https://open.aliplus.com/docs/open
-
-# 硬件条件
-  * esp32模组
-  * led灯
+1. 熟悉esp32_idf的[使用](http://esp-idf.readthedocs.io/en/latest/?badge=latest)
+2. 了解[阿里智能](https://open.aliplus.com/docs/open)相关知识
 
 # 配置与编译
 1. 使用'make menuconfig'中的alink_config来配置alink的工作模式、任务优先级
@@ -78,7 +71,7 @@
 
 
 # 获取工程
-要获取lenovo音频项目，请使用以下命令：
+要获取alink项目，请使用以下命令：
 git clone --recursive https://gitlab.espressif.cn:6688/customer/esp-alink.git
 
 # Related links

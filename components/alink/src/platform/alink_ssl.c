@@ -56,7 +56,11 @@ int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
     ALINK_ERROR_CHECK(ssl == NULL, ALINK_ERR, "Parameter error, ssl:%p", ssl);
 
     alink_err_t ret;
+    static void *alink_send_mutex = NULL;
+    if (alink_send_mutex == NULL) alink_send_mutex = platform_mutex_init();
+    platform_mutex_lock(alink_send_mutex);
     ret = SSL_write((SSL *)ssl, buffer, length);
+    platform_mutex_unlock(alink_send_mutex);
 
     ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_write, ret:%d", ret);
     return ret;
@@ -67,7 +71,11 @@ int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
     ALINK_PARAM_CHECK(ssl == NULL);
     ALINK_PARAM_CHECK(buffer == NULL);
     int ret = -1;
+    static void *alink_recv_mutex = NULL;
+    if (alink_recv_mutex == NULL) alink_recv_mutex = platform_mutex_init();
+    platform_mutex_lock(alink_recv_mutex);
     ret = SSL_read((SSL*)ssl, buffer, length);
+    platform_mutex_unlock(alink_recv_mutex);
     if (ret <= 0) ALINK_LOGE("SSL_read, ret:%d", ret);
     return ret;
 }

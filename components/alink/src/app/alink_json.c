@@ -32,6 +32,8 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "lwip/sockets.h"
+#include "esp_err.h"
+#include "esp_system.h"
 
 #include "platform/platform.h"
 #include "product/product.h"
@@ -51,8 +53,10 @@ void *alink_sample_mutex;
 alink_up_cmd_ptr alink_up_cmd_malloc()
 {
     alink_up_cmd_ptr up_cmd = (alink_up_cmd_ptr)malloc(sizeof(alink_up_cmd));
+    ALINK_ERROR_CHECK(up_cmd == NULL, NULL, "malloc ret: %p, free_heap: %d", up_cmd, esp_get_free_heap_size());
     memset(up_cmd, 0, sizeof(alink_up_cmd));
     up_cmd->param = (char *)malloc(ALINK_DATA_LEN);
+    ALINK_ERROR_CHECK(up_cmd->param == NULL, NULL, "malloc ret: %p, free_heap: %d", up_cmd, esp_get_free_heap_size());
     memset(up_cmd->param, 0, sizeof(ALINK_DATA_LEN));
     return up_cmd;
 }
@@ -78,11 +82,15 @@ alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_p
 alink_down_cmd_ptr alink_down_cmd_malloc()
 {
     alink_down_cmd_ptr down_cmd = (alink_down_cmd_ptr)malloc(sizeof(alink_down_cmd));
+    ALINK_ERROR_CHECK(down_cmd == NULL, NULL, "malloc ret: %p, free_heap: %d", down_cmd, esp_get_free_heap_size());
     memset(down_cmd, 0, sizeof(alink_down_cmd));
 
     down_cmd->account = (char *)malloc(ALINK_DATA_LEN);
+    ALINK_ERROR_CHECK(down_cmd->account == NULL, NULL, "malloc ret: %p, free_heap: %d", down_cmd->account, esp_get_free_heap_size());
     down_cmd->param   = (char *)malloc(ALINK_DATA_LEN);
+    ALINK_ERROR_CHECK(down_cmd->param == NULL, NULL, "malloc ret: %p, free_heap: %d", down_cmd->param , esp_get_free_heap_size());
     down_cmd->retData = (char *)malloc(ALINK_DATA_LEN);
+    ALINK_ERROR_CHECK(down_cmd->retData == NULL, NULL, "malloc ret: %p, free_heap: %d", down_cmd->retData, esp_get_free_heap_size());
     memset(down_cmd->account, 0, sizeof(ALINK_DATA_LEN));
     memset(down_cmd->param, 0, sizeof(ALINK_DATA_LEN));
     memset(down_cmd->retData, 0, sizeof(ALINK_DATA_LEN));
@@ -231,7 +239,7 @@ void alink_trans_init(void *arg)
     alink_fill_deviceinfo(main_dev);
     alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
                        ALINK_LL_ERROR | ALINK_LL_DUMP);
-    // alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_ERROR | ALINK_LL_DUMP);
+    // alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_DUMP);
     main_dev->sys_callback[ALINK_FUNC_SERVER_STATUS] = alink_handler_systemstates_callback;
 
 
@@ -307,7 +315,7 @@ int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait)
     memcpy(q_data->param, up_cmd, param_size);
     ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
-        ALINK_LOGE("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        ALINK_LOGD("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
         xSemaphoreGive(xSemWrite);
         return ALINK_ERR;
     }
