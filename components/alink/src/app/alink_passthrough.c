@@ -31,6 +31,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "lwip/sockets.h"
+#include "esp_system.h"
 
 #include "alink_export.h"
 #include <stdlib.h>
@@ -38,7 +39,7 @@
 #include <string.h>
 #include "alink_export_rawdata.h"
 #include "esp_alink.h"
-#ifdef ALINK_PASSTHROUG
+#ifdef ALINK_PASSTHROUGH
 
 typedef struct alink_raw_data
 {
@@ -58,8 +59,10 @@ alink_raw_data_ptr alink_raw_data_malloc(size_t len)
 {
     ALINK_PARAM_CHECK(len > ALINK_DATA_LEN);
     alink_raw_data_ptr raw_data = (alink_raw_data_ptr)malloc(sizeof(alink_raw_data));
+    ALINK_ERROR_CHECK(raw_data == NULL, NULL, "malloc ret: %p, free_heap: %d", raw_data, esp_get_free_heap_size());
     memset(raw_data, 0, sizeof(alink_raw_data));
     raw_data->data = (char *)malloc(len);
+    ALINK_ERROR_CHECK(raw_data->data == NULL, NULL, "malloc ret: %p, free_heap: %d", raw_data->data, esp_get_free_heap_size());
     memset(raw_data->data, 0, len);
     return raw_data;
 }
@@ -72,14 +75,6 @@ alink_err_t alink_raw_data_free(_IN_ alink_raw_data_ptr raw_data)
     return ALINK_OK;
 }
 
-// alink_err_t alink_raw_data_memcpy(_IN_ alink_raw_data_ptr dest, _OUT_ alink_raw_data_ptr src)
-// {
-//     ALINK_PARAM_CHECK(dest == NULL);
-//     ALINK_PARAM_CHECK(src == NULL);
-//     dest->len = src->len;
-//     if (src->data) memcpy(dest->data, src->data, src->len);
-//     return ALINK_OK;
-// }
 
 static int alink_device_post_raw_data(void)
 {
@@ -118,7 +113,9 @@ static int rawdata_get_callback(const char *in_rawdata, int in_len, char *out_ra
     memcpy(q_data->data, in_rawdata, in_len);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
+        alink_raw_data_free(q_data);
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
+        return ALINK_ERR;
     }
     return ALINK_OK;
 }
@@ -133,7 +130,9 @@ static int rawdata_set_callback(_IN_ char *rawdata, int len)
     memcpy(q_data->data, rawdata, len);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
+        alink_raw_data_free(q_data);
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
+        return ALINK_ERR;
     }
     return ALINK_OK;
 }
@@ -200,6 +199,7 @@ void alink_trans_init(void *arg)
     alink_fill_deviceinfo(main_dev);
     alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
                        ALINK_LL_ERROR | ALINK_LL_DUMP);
+    // alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_WARN);
     main_dev->sys_callback[ALINK_FUNC_SERVER_STATUS] = alink_handler_systemstates_callback;
 
     /*start alink-sdk */
@@ -231,7 +231,8 @@ int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait)
     memcpy(q_data->data, up_cmd, q_data->len);
     ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
-        ALINK_LOGE("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        ALINK_LOGW("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        alink_raw_data_free(q_data);
         xSemaphoreGive(xSemWrite);
         return ALINK_ERR;
     }

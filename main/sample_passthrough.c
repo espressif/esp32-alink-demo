@@ -25,8 +25,8 @@
 #include "esp_alink.h"
 #ifdef ALINK_PASSTHROUGH
 
-static const char *TAG = "app_main";
-static SemaphoreHandle_t xSemWrite = NULL;
+static const char *TAG = "sample_passthrough";
+SemaphoreHandle_t xSemWrite = NULL;
 
 /*do your job here*/
 struct virtual_dev {
@@ -47,7 +47,8 @@ void read_task_test(void *arg)
         ALINK_LOGD("read_data: %02x %02x %d %d %d %d %d %02x",
                    down_cmd[0], down_cmd[1], down_cmd[2], down_cmd[3],
                    down_cmd[4], down_cmd[5], down_cmd[6], down_cmd[7]);
-        memcpy(&virtual_device, down_cmd + 2, 5);
+        if ((down_cmd[0] == 0xaa) && (down_cmd[1] == 0x07) && (down_cmd[7] == 0x55))
+            memcpy(&virtual_device, down_cmd + 2, 5);
         ALINK_LOGI("\npower:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
                    virtual_device.power, virtual_device.temp_value, virtual_device.light_value, virtual_device.time_delay, virtual_device.work_mode);
         xSemaphoreGive(xSemWrite);
@@ -65,7 +66,7 @@ void write_task_test(void *arg)
     for (;;) {
         xSemaphoreTake(xSemWrite, portMAX_DELAY);
         memcpy(up_cmd + 2, &virtual_device, 5);
-        esp_write(up_cmd, 8, 100 / portTICK_PERIOD_MS);
+        esp_write(up_cmd, 8, 500 / portTICK_PERIOD_MS);
         ALINK_LOGD("\npower:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
                    virtual_device.power, virtual_device.temp_value, virtual_device.light_value, virtual_device.time_delay, virtual_device.work_mode);
         // platform_msleep(500);
@@ -73,6 +74,17 @@ void write_task_test(void *arg)
     free(up_cmd);
     vTaskDelete(NULL);
 }
+
+static void free_heap_task(void *arg)
+{
+    while (1) {
+        // mem_debug_malloc_show();
+        ALINK_LOGI("free heap size: %d\n", esp_get_free_heap_size());
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
+    vTaskDelete(NULL);
+}
+
 
 /******************************************************************************
  * FunctionName : app_main
@@ -106,11 +118,10 @@ void app_main()
     };
     esp_alink_init(&product_info);
     ALINK_LOGI("esp32 alink version: %s", product_info.version);
-
-    xSemWrite = xSemaphoreCreateBinary();
-    xSemaphoreGive(xSemWrite);
-    xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
-    xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 9, NULL);
+    if (xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
+    xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 4, NULL);
+    xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 4, NULL);
+    // xTaskCreate(free_heap_task, "free_heap_task", 1024 * 8, NULL, 9, NULL);
     printf("free_heap3:%u\n", esp_get_free_heap_size());
 }
 

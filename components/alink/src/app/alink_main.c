@@ -37,6 +37,7 @@ extern alink_err_t alink_key_scan(TickType_t ticks_to_wait);
 
 extern alink_err_t aws_softap_init(_OUT_ wifi_config_t * wifi_config);
 extern alink_err_t aws_smartconfig_init(_OUT_ wifi_config_t *wifi_config);
+extern SemaphoreHandle_t xSemWrite;
 
 alink_err_t alink_read_wifi_config(_OUT_ wifi_config_t *wifi_config)
 {
@@ -147,6 +148,8 @@ static alink_err_t event_handler(void *ctx, system_event_t *event)
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         xSemaphoreGive(xSemConnet);
+        if(xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
+        xSemaphoreGive(xSemWrite);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
@@ -189,11 +192,13 @@ alink_err_t alink_connect_ap()
 
     ret = aws_smartconfig_init(&wifi_config);
     if (ret == ALINK_OK) {
-        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)
+        if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK) {
             goto EXIT;
+        }
     }
+    aws_destroy();
 
-    ALINK_LOGI("********ENTER SOFTAP MODE******");
+    ALINK_LOGI("******** ENTER SOFTAP MODE ******");
     ret = aws_softap_init(&wifi_config);
     if (ret == ALINK_OK) {
         if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)
@@ -202,7 +207,6 @@ alink_err_t alink_connect_ap()
 
     return ALINK_ERR;
 EXIT:
-
     alink_write_wifi_config(&wifi_config);
     aws_notify_app();
     aws_destroy();
@@ -222,5 +226,6 @@ void esp_alink_init(_IN_ const struct device_info *product_info)
     product_set(product_info);
 
     alink_connect_ap();
-    xTaskCreate(alink_trans_init, "alink_trans_init", 1024 * 4, NULL, 9, NULL);
+    xTaskCreate(alink_trans_init, "alink_trans_init", 1024 * 4, NULL, DEFAULU_TASK_PRIOTY, NULL);
+    xSemaphoreGive(xSemAinkInitFinsh);
 }

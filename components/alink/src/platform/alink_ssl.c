@@ -76,7 +76,8 @@ int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
     platform_mutex_lock(alink_recv_mutex);
     ret = SSL_read((SSL*)ssl, buffer, length);
     platform_mutex_unlock(alink_recv_mutex);
-    if (ret <= 0) ALINK_LOGE("SSL_read, ret:%d", ret);
+
+    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_read, ret:%d", ret);
     return ret;
 }
 

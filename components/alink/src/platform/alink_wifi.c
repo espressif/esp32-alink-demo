@@ -51,11 +51,13 @@ static void IRAM_ATTR  wifi_sniffer_cb_(void *recv_buf, wifi_promiscuous_pkt_typ
 //若是rtos的平台，注册收包回调函数aws_80211_frame_handler()到系统接口
 void platform_awss_open_monitor(_IN_ platform_awss_recv_80211_frame_cb_t cb)
 {
+    wifi_promiscuous_filter_t filter = {2, 0, 0, 0};
     g_sniffer_cb = cb;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_channel(6, 0));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(0));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_cb_));
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_filter(&filter));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(1));
 }
 

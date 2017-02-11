@@ -139,7 +139,7 @@ void platform_msleep(_IN_ uint32_t ms)
 
 uint32_t platform_get_time_ms(void)
 {
-    return xTaskGetTickCount() / portTICK_RATE_MS;
+    return system_get_time() / 1000;
 }
 
 int platform_thread_get_stack_size(_IN_ const char *thread_name)

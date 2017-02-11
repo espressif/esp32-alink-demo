@@ -40,7 +40,7 @@
 #include "alink_export.h"
 #include "esp_alink.h"
 
-#ifndef ALINK_PASSTHROUG
+#ifndef ALINK_PASSTHROUGH
 
 static const char *TAG = "alink_json";
 static xQueueHandle xQueueUpCmd = NULL;
@@ -153,23 +153,25 @@ static int main_dev_set_device_status_callback(alink_down_cmd_ptr down_cmd)
     alink_down_cmd_memcpy(q_data, down_cmd);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
+        alink_down_cmd_free(q_data);
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
+        return ALINK_ERR;
     }
     return ALINK_OK;
 }
 
 static int main_dev_get_device_status_callback(alink_down_cmd_ptr down_cmd)
 {
-    /* do your job here */
     ALINK_LOGD("\nuuid:%s\nmethod:%d\nparam:%s", down_cmd->uuid, down_cmd->method, down_cmd->param);
     alink_down_cmd_ptr q_data = alink_down_cmd_malloc();
     alink_down_cmd_memcpy(q_data, down_cmd);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
+        alink_down_cmd_free(q_data);
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
+        return ALINK_ERR;
     }
     return ALINK_OK;
-    /*do your job end */
 }
 
 static int alink_device_post_data(alink_down_cmd_ptr down_cmd)
@@ -276,6 +278,7 @@ alink_err_t alink_write(alink_up_cmd_ptr up_cmd, TickType_t ticks_to_wait)
     ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
         ALINK_LOGE("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        alink_up_cmd_free(q_data);
         xSemaphoreGive(xSemWrite);
         return ALINK_ERR;
     }
@@ -310,12 +313,13 @@ int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait)
     xSemaphoreTake(xSemWrite, portMAX_DELAY);
     alink_err_t ret = ALINK_ERR;
     alink_up_cmd_ptr q_data = alink_up_cmd_malloc();
-    if(size < param_size) param_size = size;
+    if (size < param_size) param_size = size;
 
     memcpy(q_data->param, up_cmd, param_size);
     ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
-        ALINK_LOGD("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        ALINK_LOGW("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        alink_up_cmd_free(q_data);
         xSemaphoreGive(xSemWrite);
         return ALINK_ERR;
     }
@@ -340,7 +344,7 @@ int esp_read(char *down_cmd, size_t size, TickType_t ticks_to_wait)
     }
 
     param_size = strlen(q_data->param) + 1;
-    if(size < param_size) param_size = size;
+    if (size < param_size) param_size = size;
 
     memcpy(down_cmd, q_data->param, param_size);
     alink_down_cmd_free(q_data);
