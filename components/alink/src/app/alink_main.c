@@ -31,13 +31,13 @@ static const char *TAG = "alink_main";
 static SemaphoreHandle_t xSemConnet = NULL;
 static SemaphoreHandle_t xSemAinkInitFinsh = NULL;
 
-extern void alink_trans_init(void *arg);
+extern void alink_trans_init();
 extern void alink_key_init(uint32_t key_gpio_pin);
 extern alink_err_t alink_key_scan(TickType_t ticks_to_wait);
 
 extern alink_err_t aws_softap_init(_OUT_ wifi_config_t * wifi_config);
 extern alink_err_t aws_smartconfig_init(_OUT_ wifi_config_t *wifi_config);
-extern SemaphoreHandle_t xSemWrite;
+// extern SemaphoreHandle_t xSemWrite;
 
 alink_err_t alink_read_wifi_config(_OUT_ wifi_config_t *wifi_config)
 {
@@ -148,8 +148,8 @@ static alink_err_t event_handler(void *ctx, system_event_t *event)
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         xSemaphoreGive(xSemConnet);
-        if(xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
-        xSemaphoreGive(xSemWrite);
+        // if(xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
+        // xSemaphoreGive(xSemWrite);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
@@ -172,6 +172,7 @@ static alink_err_t wifi_sta_connect_ap(wifi_config_t *wifi_config, TickType_t ti
     ESP_ERROR_CHECK( esp_wifi_start() );
 
     BaseType_t err = xSemaphoreTake(xSemConnet, ticks_to_wait);
+    if(err != pdTRUE) ESP_ERROR_CHECK( esp_wifi_stop() );
     ALINK_ERROR_CHECK(err != pdTRUE, ALINK_ERR, "xSemaphoreTake ret:%x wait: %d", err, ticks_to_wait);
     return ALINK_OK;
 }
@@ -188,8 +189,11 @@ alink_err_t alink_connect_ap()
         if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)
             return ALINK_OK;
     }
-    esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
 
+    ALINK_LOGI("*********************************");
+    ALINK_LOGI("*    ENTER SAMARTCONFIG MODE    *");
+    ALINK_LOGI("*********************************");  
+    esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
     ret = aws_smartconfig_init(&wifi_config);
     if (ret == ALINK_OK) {
         if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK) {
@@ -198,7 +202,9 @@ alink_err_t alink_connect_ap()
     }
     aws_destroy();
 
-    ALINK_LOGI("******** ENTER SOFTAP MODE ******");
+    ALINK_LOGI("*********************************");
+    ALINK_LOGI("*       ENTER SOFTAP MODE       *");
+    ALINK_LOGI("*********************************");    
     ret = aws_softap_init(&wifi_config);
     if (ret == ALINK_OK) {
         if (wifi_sta_connect_ap(&wifi_config, WIFI_WAIT_TIME) == ALINK_OK)
@@ -226,6 +232,6 @@ void esp_alink_init(_IN_ const struct device_info *product_info)
     product_set(product_info);
 
     alink_connect_ap();
-    xTaskCreate(alink_trans_init, "alink_trans_init", 1024 * 4, NULL, DEFAULU_TASK_PRIOTY, NULL);
+    alink_trans_init(NULL);
     xSemaphoreGive(xSemAinkInitFinsh);
 }

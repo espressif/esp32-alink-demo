@@ -25,25 +25,34 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
     SSL *ssl;
     int socket = (int)tcp_fd;
     int ret = -1;
+    static void *alink_connect_mutex = NULL;
+    if (alink_connect_mutex == NULL) alink_connect_mutex = platform_mutex_init();
+    platform_mutex_lock(alink_connect_mutex);
     ALINK_LOGD("tcp_fd: %d, server_cert: %p, server_cert_len: %d",
                socket, server_cert, server_cert_len);
 
 
     ctx = SSL_CTX_new(TLSv1_1_client_method());
+    if(ctx == NULL) platform_mutex_unlock(alink_connect_mutex);
     ALINK_ERROR_CHECK(ctx == NULL, NULL, "SSL_CTX_new, ret:%p", ctx);
 
     ssl = SSL_new(ctx);
+    if(ssl == NULL) platform_mutex_unlock(alink_connect_mutex);
     ALINK_ERROR_CHECK(ssl == NULL, NULL, "SSL_new, ret: %p", ssl);
 
     SSL_set_fd(ssl, socket);
     X509 *ca_cert = d2i_X509(NULL, (unsigned char *)server_cert, server_cert_len);
+    if(ca_cert == NULL) platform_mutex_unlock(alink_connect_mutex);
     ALINK_ERROR_CHECK(ca_cert == NULL, NULL, "d2i_X509, ret: %p", ca_cert);
 
     ret = SSL_add_client_CA(ssl, ca_cert);
+    if(ret != pdTRUE) platform_mutex_unlock(alink_connect_mutex);
     ALINK_ERROR_CHECK(ret != pdTRUE, NULL, "SSL_add_client_CA, ret:%d", ret);
 
     ret = SSL_connect(ssl);
+    if(ret != pdTRUE) platform_mutex_unlock(alink_connect_mutex);
     ALINK_ERROR_CHECK(ret != pdTRUE, NULL, "SSL_connect, ret: %d", ret);
+    platform_mutex_unlock(alink_connect_mutex);
 
     return (void *)(ssl);
 }
@@ -85,6 +94,9 @@ int platform_ssl_close(_IN_ void *ssl)
 {
     ALINK_PARAM_CHECK(ssl == NULL);
     alink_err_t ret = -1;
+    static void *alink_close_mutex = NULL;
+    if (alink_close_mutex == NULL) alink_close_mutex = platform_mutex_init();
+    platform_mutex_lock(alink_close_mutex);
     ret = SSL_shutdown((SSL *)ssl);
 
     if (ret != pdTRUE) {
@@ -105,6 +117,7 @@ int platform_ssl_close(_IN_ void *ssl)
 
     if (fd >= 0) close(fd);
     else ALINK_LOGE("SSL_get_fd:%d", fd);
+    platform_mutex_unlock(alink_close_mutex);
 
     return (ret == pdTRUE) ? ALINK_OK : ALINK_ERR;
 }

@@ -45,7 +45,7 @@ static char *device_attr[5] = { "OnOff_Power", "Color_Temperature", "Light_Brigh
 const char *main_dev_params =
     "{\"OnOff_Power\": { \"value\": \"%d\" }, \"Color_Temperature\": { \"value\": \"%d\" }, \"Light_Brightness\": { \"value\": \"%d\" }, \"TimeDelay_PowerOff\": { \"value\": \"%d\"}, \"WorkMode_MasterLight\": { \"value\": \"%d\"}}";
 
-
+static xQueueHandle xQueueDownCmd = NULL;
 void read_task_test(void *arg)
 {
     char *down_cmd = (char *)malloc(ALINK_DATA_LEN);
@@ -113,16 +113,6 @@ void write_task_test(void *arg)
  * Parameters   : none
  * Returns      : none
 *******************************************************************************/
-static void free_heap_task(void *arg)
-{
-    while (1) {
-        // mem_debug_malloc_show();
-        ALINK_LOGI("free heap size: %d\n", esp_get_free_heap_size());
-        vTaskDelay(1000 / portTICK_RATE_MS);
-    }
-    vTaskDelete(NULL);
-}
-
 void app_main()
 {
     ALINK_LOGI("mode: json, free_heap: %u\n", esp_get_free_heap_size());
@@ -150,10 +140,9 @@ void app_main()
 
     esp_alink_init(&product_info);
     ALINK_LOGI("esp32 alink version: %s", product_info.version);
-    xSemWrite = xSemaphoreCreateBinary();
-    xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 4, NULL);
+    if(xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
+    xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 4, NULL);
-    // xTaskCreate(free_heap_task, "free_heap_task", 1024 * 8, NULL, 9, NULL);
     ALINK_LOGI("free_heap3:%u\n", esp_get_free_heap_size());
 }
 #endif

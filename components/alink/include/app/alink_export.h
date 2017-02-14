@@ -171,7 +171,6 @@ typedef struct alink_up_cmd {
     int emergency;
     const char *target;
     char *param;
-
 } alink_up_cmd, *alink_up_cmd_ptr;
 
 /******************************************/

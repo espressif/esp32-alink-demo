@@ -41,6 +41,9 @@
 #include "esp_alink.h"
 #ifdef ALINK_PASSTHROUGH
 
+#define DOWN_CMD_QUEUE_NUM  5
+#define UP_CMD_QUEUE_NUM    5
+
 typedef struct alink_raw_data
 {
     char *data;
@@ -48,12 +51,13 @@ typedef struct alink_raw_data
 } alink_raw_data, *alink_raw_data_ptr;
 
 static const char *TAG = "alink_passthrough";
+static alink_err_t post_data_enable = ALINK_TRUE;
 
-static xQueueHandle xQueueUpCmd = NULL;
-static xQueueHandle xQueueDownCmd = NULL;
-static SemaphoreHandle_t xSemWrite = NULL;
-static SemaphoreHandle_t xSemRead = NULL;
-static SemaphoreHandle_t alink_sample_mutex = NULL;
+static xQueueHandle xQueueDownCmd    = NULL;
+static xQueueHandle xQueueUpCmd      = NULL;
+static SemaphoreHandle_t xSemWrite   = NULL;
+static SemaphoreHandle_t xSemRead    = NULL;
+static SemaphoreHandle_t xSemDownCmd = NULL;
 
 alink_raw_data_ptr alink_raw_data_malloc(size_t len)
 {
@@ -75,39 +79,13 @@ alink_err_t alink_raw_data_free(_IN_ alink_raw_data_ptr raw_data)
     return ALINK_OK;
 }
 
-
-static int alink_device_post_raw_data(void)
-{
-    alink_err_t ret;
-    alink_raw_data_ptr up_cmd = NULL;
-    ret = xQueueReceive(xQueueUpCmd, &up_cmd, portMAX_DELAY);
-    if (ret == pdFALSE) {
-        ALINK_LOGD("There is no data to report");
-        ret = ALINK_ERR;
-        goto POST_RAW_DATA_EXIT;
-    }
-
-    ret = alink_post_device_rawdata(up_cmd->data, up_cmd->len);
-    if (ret == ALINK_ERR) {
-        ALINK_LOGW("post failed!");
-        platform_msleep(2000);
-        ret = ALINK_ERR;
-        goto POST_RAW_DATA_EXIT;
-    }
-    ALINK_LOGI("dev post data success!");
-
-POST_RAW_DATA_EXIT:
-    if(up_cmd) alink_raw_data_free(up_cmd);
-    return ret;
-}
-
 static int rawdata_get_callback(const char *in_rawdata, int in_len, char *out_rawdata, int *out_len)
 {
+    platform_mutex_lock(xSemDownCmd);
     ALINK_PARAM_CHECK(in_rawdata == NULL);
     ALINK_PARAM_CHECK(in_len <= 0);
-    ALINK_LOGI("in_rawdata: %02x %02x %d %d %d %d %d %02x",
-               in_rawdata[0], in_rawdata[1], in_rawdata[2], in_rawdata[3],
-               in_rawdata[4], in_rawdata[5], in_rawdata[6], in_rawdata[7]);
+    ALINK_LOGI("The cloud initiates a query to the device");
+    ALINK_LOGD("in_len: %d", in_len);
     alink_raw_data_ptr q_data = alink_raw_data_malloc(in_len);
     q_data->len = in_len;
     memcpy(q_data->data, in_rawdata, in_len);
@@ -115,16 +93,19 @@ static int rawdata_get_callback(const char *in_rawdata, int in_len, char *out_ra
     if (xQueueSend(xQueueDownCmd, &q_data, 0) == pdFALSE) {
         alink_raw_data_free(q_data);
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
+        platform_mutex_unlock(xSemDownCmd);
         return ALINK_ERR;
     }
+    platform_mutex_unlock(xSemDownCmd);
     return ALINK_OK;
 }
 
 static int rawdata_set_callback(_IN_ char *rawdata, int len)
 {
+    platform_mutex_lock(xSemDownCmd);
     ALINK_PARAM_CHECK(rawdata == NULL);
     ALINK_PARAM_CHECK(len <= 0);
-
+    ALINK_LOGI("The cloud is set to send instructions");
     alink_raw_data_ptr q_data = alink_raw_data_malloc(len);
     q_data->len = len;
     memcpy(q_data->data, rawdata, len);
@@ -133,8 +114,33 @@ static int rawdata_set_callback(_IN_ char *rawdata, int len)
         alink_raw_data_free(q_data);
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
         return ALINK_ERR;
+        platform_mutex_unlock(xSemDownCmd);
     }
+    platform_mutex_unlock(xSemDownCmd);
     return ALINK_OK;
+}
+
+static void alink_post_data(void *arg)
+{
+    alink_err_t ret;
+    alink_raw_data_ptr up_cmd = NULL;
+    for (; post_data_enable;) {
+        ret = xQueueReceive(xQueueUpCmd, &up_cmd, portMAX_DELAY);
+        if (ret == pdFALSE) {
+            ALINK_LOGD("There is no data to report");
+            continue;
+        }
+
+        ALINK_LOGD("alink_device_post_data: param:%p, len: %d", up_cmd->data, up_cmd->len);
+        ret = alink_post_device_rawdata(up_cmd->data, up_cmd->len);
+        if (ret == ALINK_ERR) {
+            ALINK_LOGW("post failed!");
+            platform_msleep(2000);
+        }
+        ALINK_LOGI("dev post data success!");
+        if (up_cmd) alink_raw_data_free(up_cmd);
+    }
+    vTaskDelete(NULL);
 }
 
 static int alink_handler_systemstates_callback(_IN_ void *dev_mac, _IN_ void *sys_state)
@@ -142,35 +148,29 @@ static int alink_handler_systemstates_callback(_IN_ void *dev_mac, _IN_ void *sy
     ALINK_PARAM_CHECK(dev_mac == NULL);
     ALINK_PARAM_CHECK(sys_state == NULL);
 
-    char uuid[33] = { 0 };
-    char *mac = (char *)dev_mac;
     enum ALINK_STATUS *state = (enum ALINK_STATUS *)sys_state;
     switch (*state) {
     case ALINK_STATUS_INITED:
-
+        ALINK_LOGI("ALINK_STATUS_INITED, mac %s uuid %s", (char *)dev_mac, alink_get_uuid(NULL));
         break;
     case ALINK_STATUS_REGISTERED:
-        sprintf(uuid, "%s", alink_get_uuid(NULL));
-        ALINK_LOGI("ALINK_STATUS_REGISTERED, mac %s uuid %s \n", mac,
-                 uuid);
+        ALINK_LOGI("ALINK_STATUS_REGISTERED, mac %s uuid %s", (char *)dev_mac, alink_get_uuid(NULL));
         break;
     case ALINK_STATUS_LOGGED:
-        sprintf(uuid, "%s", alink_get_uuid(NULL));
-        ALINK_LOGI("ALINK_STATUS_LOGGED, mac %s uuid %s\n", mac, uuid);
+        ALINK_LOGI("ALINK_STATUS_LOGGED, mac %s uuid %s", (char *)dev_mac, alink_get_uuid(NULL));
         break;
     default:
         break;
     }
-    return 0;
+    return ALINK_OK;
 }
-
 
 static void alink_fill_deviceinfo(_OUT_ struct device_info *deviceinfo)
 {
     ALINK_PARAM_CHECK(deviceinfo == NULL);
     /*fill main device info here */
     product_get_name(deviceinfo->name);
-    product_get_sn(deviceinfo->sn);  // 产品注册方式 如果是sn, 那么需要保障sn唯一
+    product_get_sn(deviceinfo->sn);  // Product registration if it is sn, then need to protect the only sn
     product_get_key(deviceinfo->key);
     product_get_model(deviceinfo->model);
     product_get_secret(deviceinfo->secret);
@@ -180,21 +180,21 @@ static void alink_fill_deviceinfo(_OUT_ struct device_info *deviceinfo)
     product_get_manufacturer(deviceinfo->manufacturer);
     product_get_debug_key(deviceinfo->key_sandbox);
     product_get_debug_secret(deviceinfo->secret_sandbox);
-    platform_wifi_get_mac(deviceinfo->mac);//产品注册mac唯一 or sn唯一  统一大写
-    product_get_cid(deviceinfo->cid); // 使用接口获取唯一chipid,防伪造设备
-
-    ALINK_LOGI("DEV_MODEL:%s", deviceinfo->model);
+    platform_wifi_get_mac(deviceinfo->mac);//Product registration mac only or sn only unified uppercase
+    product_get_cid(deviceinfo->cid); // Use the interface to obtain a unique chipid, anti-counterfeit device
+    ALINK_LOGD("DEV_MODEL:%s", deviceinfo->model);
 }
 
-void alink_trans_init(void *arg)
+void alink_trans_init()
 {
     struct device_info *main_dev;
-    main_dev = platform_malloc(sizeof(struct device_info));
-    alink_sample_mutex = platform_mutex_init();
-    xQueueUpCmd = xQueueCreate(3, sizeof(alink_up_cmd_ptr));
-    xQueueDownCmd = xQueueCreate(3, sizeof(alink_down_cmd_ptr));
-    xSemWrite = xSemaphoreCreateMutex();
-    xSemRead = xSemaphoreCreateMutex();
+    post_data_enable = ALINK_TRUE;
+    main_dev         = platform_malloc(sizeof(struct device_info));
+    xSemWrite        = platform_mutex_init();
+    xSemRead         = platform_mutex_init();
+    xSemDownCmd      = platform_mutex_init();
+    xQueueUpCmd      = xQueueCreate(DOWN_CMD_QUEUE_NUM, sizeof(alink_down_cmd_ptr));
+    xQueueDownCmd    = xQueueCreate(UP_CMD_QUEUE_NUM, sizeof(alink_down_cmd_ptr));
     memset(main_dev, 0, sizeof(struct device_info));
     alink_fill_deviceinfo(main_dev);
     alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN |
@@ -209,58 +209,63 @@ void alink_trans_init(void *arg)
     ALINK_LOGI("wait main device login");
     /*wait main device login, -1 means wait forever */
     alink_wait_connect(NULL, ALINK_WAIT_FOREVER);
-
-    for(;;) alink_device_post_raw_data();
-
-    alink_end();
-    platform_mutex_destroy(alink_sample_mutex);
-    vTaskDelete(NULL);
+    xTaskCreate(alink_post_data, "alink_post_data", 1024 * 4, NULL, DEFAULU_TASK_PRIOTY, NULL);
 }
 
-int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait)
+void alink_trans_destroy()
 {
+    post_data_enable = ALINK_FALSE;
+    alink_end();
+    platform_mutex_destroy(xSemWrite);
+    platform_mutex_destroy(xSemRead);
+    platform_mutex_destroy(xSemDownCmd);
+    vQueueDelete(xQueueUpCmd);
+    vQueueDelete(xQueueDownCmd);
+}
+
+int esp_write(_IN_ void *up_cmd, size_t size, TickType_t ticks_to_wait)
+{
+    platform_mutex_lock(xSemWrite);
     ALINK_PARAM_CHECK(up_cmd == NULL);
     ALINK_PARAM_CHECK(size == 0 || size > ALINK_DATA_LEN);
 
-    xSemaphoreTake(xSemWrite, portMAX_DELAY);
     alink_err_t ret = ALINK_ERR;
     alink_raw_data_ptr q_data = alink_raw_data_malloc(ALINK_DATA_LEN);
     q_data->len = ALINK_DATA_LEN;
-    if(size < q_data->len) q_data->len = size;
+    if (size < q_data->len) q_data->len = size;
 
     memcpy(q_data->data, up_cmd, q_data->len);
     ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
-        ALINK_LOGW("xQueueSend xQueueUpCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        ALINK_LOGW("xQueueSend xQueueUpCmd, wait_time: %d", ticks_to_wait);
         alink_raw_data_free(q_data);
-        xSemaphoreGive(xSemWrite);
+        platform_mutex_unlock(xSemWrite);
         return ALINK_ERR;
     }
-    xSemaphoreGive(xSemWrite);
+    platform_mutex_unlock(xSemWrite);
     return ALINK_OK;
 }
 
-int esp_read(char *down_cmd, size_t size, TickType_t ticks_to_wait)
+int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait)
 {
+    platform_mutex_lock(xSemRead);
     ALINK_PARAM_CHECK(down_cmd == NULL);
     ALINK_PARAM_CHECK(size == 0 || size > ALINK_DATA_LEN);
 
-    xSemaphoreTake(xSemRead, portMAX_DELAY);
     alink_err_t ret = ALINK_ERR;
-    size_t param_size = 0;
 
     alink_raw_data_ptr q_data = NULL;
     ret = xQueueReceive(xQueueDownCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
         ALINK_LOGE("xQueueReceive xQueueDownCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
-        xSemaphoreGive(xSemRead);
+        platform_mutex_unlock(xSemRead);
         return ALINK_ERR;
     }
 
-    param_size = q_data->len;
-    memcpy(down_cmd, q_data->data, param_size);
+    if (q_data->len < size) size = q_data->len;
+    memcpy(down_cmd, q_data->data, size);
     alink_raw_data_free(q_data);
-    xSemaphoreGive(xSemRead);
-    return param_size;
+    platform_mutex_unlock(xSemRead);
+    return size;
 }
 #endif

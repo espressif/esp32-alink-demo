@@ -68,13 +68,13 @@ typedef int32_t alink_err_t;
 /* alink_os */
 #define ALINK_CHIPID "esp32"
 #define SYSTEM_VERSION "esp32_idf"
-#define MODULE_NAME "esp32"
+#define MODULE_NAME "ESP-WROOM-32"
 
 
 #define ALINK_DATA_LEN 512
 /* alink_main */
-int esp_write(char *up_cmd, size_t size, TickType_t ticks_to_wait);
-int esp_read(char *down_cmd, size_t size, TickType_t ticks_to_wait);
+int esp_write(_IN_ void *up_cmd, size_t size, TickType_t ticks_to_wait);
+int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait);
 
 void esp_alink_init(_IN_ const struct device_info *product_info);
 
@@ -84,7 +84,7 @@ void esp_alink_init(_IN_ const struct device_info *product_info);
 // alink_down_cmd_ptr alink_down_cmd_malloc();
 // alink_err_t alink_down_cmd_free(_IN_ alink_down_cmd_ptr down_cmd);
 // alink_err_t alink_down_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src);
-alink_err_t alink_write(alink_up_cmd_ptr up_cmd, TickType_t ticks_to_wait);
+alink_err_t alink_write(alink_up_cmd_ptr up_cmd);
 alink_err_t alink_read(alink_down_cmd_ptr down_cmd, TickType_t ticks_to_wait);
 
 #endif
