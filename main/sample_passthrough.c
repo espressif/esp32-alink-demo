@@ -26,7 +26,7 @@
 #ifdef ALINK_PASSTHROUGH
 
 static const char *TAG = "sample_passthrough";
-static xQueueHandle xQueueDevInfo = NULL;
+SemaphoreHandle_t xSemWriteInfo = NULL;
 #define DEV_INFO_QUEUE_NUM        2
 #define LIGHT_METADATA_HEADER   0xaa
 #define LIGHT_METADATA_END      0x55
@@ -67,13 +67,10 @@ void read_task_test(void *arg)
 
         if (ret == sizeof(dev_info_t) && (down_cmd.header == LIGHT_METADATA_HEADER) && (down_cmd.end == LIGHT_METADATA_END)) {
             memcpy(&light_info, &down_cmd, sizeof(dev_info_t));
-            ALINK_LOGI("power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
+            ALINK_LOGD("read: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
                        light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
         }
-
-        if (xQueueSend(xQueueDevInfo, &light_info, 0) == pdFALSE) {
-            ALINK_LOGD("xQueueSend: xQueueDevInfo is full");
-        }
+        xSemaphoreGive(xSemWriteInfo);
     }
     vTaskDelete(NULL);
 }
@@ -81,16 +78,15 @@ void read_task_test(void *arg)
 void write_task_test(void *arg)
 {
     alink_err_t ret = ALINK_ERR;
-    dev_info_t up_cmd;
     for (;;) {
-        if (xQueueReceive(xQueueDevInfo, &up_cmd, portMAX_DELAY) == pdFALSE) {
-            ALINK_LOGE("xQueueReceive:xQueueDevInfo is empty");
+        if (xSemaphoreTake(xSemWriteInfo, portMAX_DELAY) == pdFALSE) {
+            ALINK_LOGE("xSemaphoreTake:xQueueDevInfo is empty");
             break;
         }
-        ret = esp_write(&up_cmd, sizeof(dev_info_t), 500 / portTICK_PERIOD_MS);
+        ALINK_LOGD("write: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
+                   light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
+        ret = esp_write(&light_info, sizeof(dev_info_t), 500 / portTICK_PERIOD_MS);
         if (ret == ALINK_ERR) ALINK_LOGW("esp_write is err");
-
-        // platform_msleep(500);
     }
     vTaskDelete(NULL);
 }
@@ -135,14 +131,7 @@ void app_main()
     ALINK_LOGI("model  : %s", product_info.model);
     esp_alink_init(&product_info);
 
-    if (xQueueDevInfo == NULL)
-        xQueueDevInfo = xQueueCreate(DEV_INFO_QUEUE_NUM, sizeof(dev_info_t));
-
-    /* After the device is powered on, it automatically reports all attribute status data */
-    if (xQueueSend(xQueueDevInfo, &light_info, 0) == pdFALSE) {
-        ALINK_LOGD("xQueueSend: xQueueDevInfo is full");
-    }
-
+    if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
     xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 4, NULL);
     printf("free_heap3:%u\n", esp_get_free_heap_size());

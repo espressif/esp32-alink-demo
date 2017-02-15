@@ -295,6 +295,13 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     pfd_write_set = NULL;
 
     if (NULL != read_fds) {
+        if (((int *)read_fds)[1] == ((int *)read_fds)[2]) {
+            int tmp_fd[PLATFORM_SOCKET_MAXNUMS] = {((int *)read_fds)[0], -1, -1, -1, -1, -1, -1, -1, -1, -1};
+            memcpy((int *)read_fds, tmp_fd, sizeof(tmp_fd));
+            ALINK_LOGD("read_fds: %d %d %d %d",
+                       ((int *)read_fds)[0], ((int *)read_fds)[1], ((int *)read_fds)[2], ((int *)read_fds)[3]);
+        }
+
         pfd_read_set = malloc(sizeof(fd_set));
         if (NULL == pfd_read_set) {
             ALINK_LOGE("pfd_read_set");

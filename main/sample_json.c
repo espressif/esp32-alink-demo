@@ -22,6 +22,7 @@
 #include "nvs_flash.h"
 
 #include "esp_alink.h"
+#include "cJSON.h"
 
 #ifndef ALINK_PASSTHROUGH
 static const char *TAG = "app_main";
@@ -45,7 +46,6 @@ static char *device_attr[5] = { "OnOff_Power", "Color_Temperature", "Light_Brigh
 const char *main_dev_params =
     "{\"OnOff_Power\": { \"value\": \"%d\" }, \"Color_Temperature\": { \"value\": \"%d\" }, \"Light_Brightness\": { \"value\": \"%d\" }, \"TimeDelay_PowerOff\": { \"value\": \"%d\"}, \"WorkMode_MasterLight\": { \"value\": \"%d\"}}";
 
-static xQueueHandle xQueueDownCmd = NULL;
 void read_task_test(void *arg)
 {
     char *down_cmd = (char *)malloc(ALINK_DATA_LEN);
@@ -92,6 +92,7 @@ void read_task_test(void *arg)
 
 void write_task_test(void *arg)
 {
+    alink_err_t ret = ALINK_ERR;
     char *up_cmd = (char *)malloc(ALINK_DATA_LEN);
     for (;;) {
         xSemaphoreTake(xSemWrite, portMAX_DELAY);
@@ -99,7 +100,8 @@ void write_task_test(void *arg)
         sprintf(up_cmd, main_dev_params, virtual_device.power,
                 virtual_device.temp_value, virtual_device.light_value,
                 virtual_device.time_delay, virtual_device.work_mode);
-        esp_write(up_cmd, ALINK_DATA_LEN, 500 / portTICK_PERIOD_MS);
+        ret = esp_write(up_cmd, ALINK_DATA_LEN, 500 / portTICK_PERIOD_MS);
+        if (ret == ALINK_ERR) ALINK_LOGW("esp_write is err");
         // platform_msleep(500);
     }
     free(up_cmd);
@@ -138,9 +140,16 @@ void app_main()
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
     };
 
+    ALINK_LOGI("*********************************");
+    ALINK_LOGI("*         PRODUCT INFO          *");
+    ALINK_LOGI("*********************************");
+    ALINK_LOGI("name   : %s", product_info.name);
+    ALINK_LOGI("type   : %s", product_info.type);
+    ALINK_LOGI("version: %s", product_info.version);
+    ALINK_LOGI("model  : %s", product_info.model);
     esp_alink_init(&product_info);
-    ALINK_LOGI("esp32 alink version: %s", product_info.version);
-    if(xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
+
+    if (xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
     xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 4, NULL);
     ALINK_LOGI("free_heap3:%u\n", esp_get_free_heap_size());

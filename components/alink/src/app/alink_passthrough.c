@@ -51,6 +51,7 @@ typedef struct alink_raw_data
 } alink_raw_data, *alink_raw_data_ptr;
 
 static const char *TAG = "alink_passthrough";
+extern SemaphoreHandle_t xSemWriteInfo;
 static alink_err_t post_data_enable = ALINK_TRUE;
 
 static xQueueHandle xQueueDownCmd    = NULL;
@@ -158,6 +159,9 @@ static int alink_handler_systemstates_callback(_IN_ void *dev_mac, _IN_ void *sy
         break;
     case ALINK_STATUS_LOGGED:
         ALINK_LOGI("ALINK_STATUS_LOGGED, mac %s uuid %s", (char *)dev_mac, alink_get_uuid(NULL));
+        vTaskDelay(100 / portTICK_RATE_MS);
+        if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
+        xSemaphoreGive(xSemWriteInfo);
         break;
     default:
         break;
