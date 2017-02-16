@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "lwip/sockets.h"
+#include "json_parser.h"
 
 #include <stdio.h>
 typedef int32_t alink_err_t;
@@ -76,15 +77,6 @@ typedef int32_t alink_err_t;
 int esp_write(_IN_ void *up_cmd, size_t size, TickType_t ticks_to_wait);
 int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait);
 
-void esp_alink_init(_IN_ const struct device_info *product_info);
-
-// alink_up_cmd_ptr alink_up_cmd_malloc();
-// alink_err_t alink_up_cmd_free(_IN_ alink_up_cmd_ptr up_cmd);
-// alink_err_t alink_up_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src);
-// alink_down_cmd_ptr alink_down_cmd_malloc();
-// alink_err_t alink_down_cmd_free(_IN_ alink_down_cmd_ptr down_cmd);
-// alink_err_t alink_down_cmd_memcpy(_IN_ alink_up_cmd_ptr dest, _OUT_ alink_up_cmd_ptr src);
-alink_err_t alink_write(alink_up_cmd_ptr up_cmd);
-alink_err_t alink_read(alink_down_cmd_ptr down_cmd, TickType_t ticks_to_wait);
+void esp_alink_init(_IN_ const void *product_info);
 
 #endif

@@ -24,7 +24,6 @@
  * INCLUDING THE WARRANTIES OF MERCHANTIBILITY, FITNESS FOR A PARTICULAR
  * PURPOSE, TITLE, AND NONINFRINGEMENT.
  */
-
 #ifndef __PLATFORM_H__
 #define __PLATFORM_H__
 
@@ -33,65 +32,49 @@ extern "C"
 {
 #endif
 
-/* mask next line, if stdlib is not used */
-#define USE_STDLIB_H
-
-/* mask next line, if stdint.h is not defined */
-#define USE_STDINT_H
-
-
-#ifdef USE_STDLIB_H
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#endif
 
+/* mask this line, if stdint.h is not defined */
+#define USE_STDINT_H
 
 #ifdef USE_STDINT_H
-#include <stdint.h>
+    #include <stdint.h>
 #else
-typedef signed char        int8_t;
-typedef signed short       int16_t;
-typedef signed int         int32_t;
-typedef unsigned char      uint8_t;
-typedef unsigned short     uint16_t;
-typedef unsigned int       uint32_t;
-typedef unsigned long long uint64_t;
+    typedef signed char     int8_t;
+    typedef signed short    int16_t;
+    typedef signed int     int32_t;
+    typedef unsigned char   uint8_t;
+    typedef unsigned short  uint16_t;
+    typedef unsigned int       uint32_t;
+    typedef unsigned long long uint64_t;
 #endif
 
-/** @defgroup group_platform group_platform
+/** @defgroup group_platform platform
  *  @{
  */
 
 
-/** @defgroup platform_macro platform_macro
- *  @{
- */
-
-#define _IN_            /**< indicate that this is a input parameter. */
-#define _OUT_           /**< indicate that this is a output parameter. */
-#define _INOUT_         /**< indicate that this is a io parameter. */
-#define _IN_OPT_        /**< indicate that this is a optional input parameter. */
-#define _OUT_OPT_       /**< indicate that this is a optional output parameter. */
-#define _INOUT_OPT_     /**< indicate that this is a optional io parameter. */
+#define _IN_			/**< indicate that this is a input parameter. */
+#define _OUT_			/**< indicate that this is a output parameter. */
+#define _INOUT_			/**< indicate that this is a io parameter. */
+#define _IN_OPT_		/**< indicate that this is a optional input parameter. */
+#define _OUT_OPT_		/**< indicate that this is a optional output parameter. */
+#define _INOUT_OPT_		/**< indicate that this is a optional io parameter. */
 
 
-#define PLATFORM_SOCKET_MAXNUMS         (10)
-#define PLATFORM_WAIT_INFINITE          (~0)
-#define PLATFORM_INVALID_FD             ((void *)-1)
+#define PLATFORM_SOCKET_MAXNUMS			(10)
+#define PLATFORM_WAIT_INFINITE			(~0)
+#define PLATFORM_INVALID_FD			((void *)-1)
 
 #define STR_SHORT_LEN                   (32)
 #define STR_LONG_LEN                    (128)
 
 
-
-/** @} */ //end of platform_macro
-
-
-
 /*********************************** thread interface ***********************************/
 
-/** @defgroup group_platform_thread platform_thread
+/** @defgroup group_platform_thread thread
  *  @{
  */
 
@@ -101,12 +84,11 @@ typedef unsigned long long uint64_t;
  * @param[out] thread @n The new thread handle.
  * @param[in] name @n thread name.
  * @param[in] start_routine @n A pointer to the application-defined function to be executed by the thread.
-        This pointer represents the starting address of the thread.
+		This pointer represents the starting address of the thread.
  * @param[in] arg @n A pointer to a variable to be passed to the start_routine.
  * @param[in] stack @n A pointer to stack buffer malloced by caller, if platform used this buffer, set stack_used to non-zero value,  otherwise set it to 0.
  * @param[in] stack_size @n The initial size of the stack, in bytes. see platform_get_thread_stack_size().
  * @param[out] stack_used @n if platform used stack buffer, set stack_used to 1, otherwise set it to 0.
-   @endverbatim
  * @return
    @verbatim
      = 0: on success.
@@ -116,15 +98,13 @@ typedef unsigned long long uint64_t;
  * @note None.
  */
 int platform_thread_create(
-    _OUT_ void **thread,
-    _IN_ const char *name,
-    _IN_ void *(*start_routine) (void *),
-    _IN_ void *arg,
-    _IN_ void *stack,
-    _IN_ uint32_t stack_size,
-    _OUT_ int *stack_used);
-
-
+		_OUT_ void **thread,
+		_IN_ const char *name,
+		_IN_ void *(*start_routine) (void *),
+		_IN_ void *arg,
+		_IN_ void *stack,
+		_IN_ uint32_t stack_size,
+		_OUT_ int *stack_used);
 
 /**
  * @brief exit the thread itself.
@@ -140,7 +120,7 @@ void platform_thread_exit(_IN_ void *thread);
  * @brief get thread stack size in this platform.
  *
  * @param[in] thread_name: specify the thread by uniform thread name.
- * @return thread stack size.
+ * @return thread name.
  * @see None.
  * @note there are 6 threads included:
  *   1) wsf_receive_worker;
@@ -168,7 +148,7 @@ void platform_msleep(_IN_ uint32_t ms);
 
 /*********************************** mutex interface ***********************************/
 
-/** @defgroup group_platform_mutex platform_mutex
+/** @defgroup group_platform_mutex mutex
  *  @{
  */
 
@@ -224,7 +204,7 @@ void platform_mutex_unlock(_IN_ void *mutex);
 /********************************* semaphore interface *********************************/
 
 
-/** @defgroup group_platform_semaphore platform_semaphore
+/** @defgroup group_platform_semaphore semaphore
  *  @{
  */
 
@@ -287,7 +267,7 @@ void platform_semaphore_post(_IN_ void *sem);
 /********************************** memory interface **********************************/
 
 
-/** @defgroup group_platform_memory_manage platform_memory_manage
+/** @defgroup group_platform_memory_manage memory
  *  @{
  */
 
@@ -319,7 +299,7 @@ void platform_free(_IN_ void *ptr);
 
 /********************************** network interface **********************************/
 
-/** @defgroup group_network platform_network
+/** @defgroup group_network network
  *  @{
  */
 
@@ -328,8 +308,8 @@ void platform_free(_IN_ void *ptr);
  */
 typedef struct
 {
-    char *host; /**< host ip(dotted-decimal notation) or host name(string) */
-    uint16_t port; /**< udp port or tcp port */
+	char *host; /**< host ip(dotted-decimal notation) or host name(string) */
+	uint16_t port; /**< udp port or tcp port */
 } platform_netaddr_t, *pplatform_netaddr_t;
 
 
@@ -379,7 +359,7 @@ void *platform_udp_client_create(void);
  * @note None.
  *
  */
-void *platform_udp_multicast_server_create(_IN_ platform_netaddr_t *netaddr);
+void *platform_udp_multicast_server_create(platform_netaddr_t *netaddr);
 
 /**
  * @brief Closes an existing udp connection.
@@ -389,7 +369,7 @@ void *platform_udp_multicast_server_create(_IN_ platform_netaddr_t *netaddr);
  * @see None.
  * @note None.
  */
-void platform_udp_close(_IN_ void *handle);
+void platform_udp_close(void *handle);
 
 
 
@@ -410,10 +390,10 @@ void platform_udp_close(_IN_ void *handle);
  * @note blocking API.
  */
 int platform_udp_sendto(
-    _IN_ void *handle,
-    _IN_ const char *buffer,
-    _IN_ uint32_t length,
-    _IN_ platform_netaddr_t *netaddr);
+		_IN_ void *handle,
+		_IN_ const char *buffer,
+		_IN_ uint32_t length,
+		_IN_ platform_netaddr_t *netaddr);
 
 
 /**
@@ -433,10 +413,10 @@ int platform_udp_sendto(
  * @note blocking API.
  */
 int platform_udp_recvfrom(
-    _IN_ void *handle,
-    _OUT_ char *buffer,
-    _IN_ uint32_t length,
-    _OUT_ platform_netaddr_t *netaddr);
+		_IN_ void *handle,
+		_OUT_ char *buffer,
+		_IN_ uint32_t length,
+		_OUT_OPT_ platform_netaddr_t *netaddr);
 
 
 
@@ -563,9 +543,9 @@ void platform_tcp_close(_IN_ void *handle);
  * @note None.
  */
 int platform_select(
-    _INOUT_OPT_ void *read_fds[PLATFORM_SOCKET_MAXNUMS],
-    _INOUT_OPT_ void *write_fds[PLATFORM_SOCKET_MAXNUMS],
-    _IN_ int timeout_ms);
+		_INOUT_OPT_ void *read_fds[PLATFORM_SOCKET_MAXNUMS],
+		_INOUT_OPT_ void *write_fds[PLATFORM_SOCKET_MAXNUMS],
+		_IN_ int timeout_ms);
 
 
 /** @} */ //end of platform_network
@@ -574,7 +554,7 @@ int platform_select(
 
 /************************************ SSL interface ************************************/
 
-/** @defgroup group_platform_ssl platform_ssl
+/** @defgroup group_platform_ssl ssl
  *  @{
  */
 
@@ -582,15 +562,10 @@ int platform_select(
  * @brief Establish a ssl connection.
  *
  * @param[in] tcp_fd @n The network connection handle.
- * @param[in] server_cert @n Specify the sever certificate which is PEM format in default (It
- *   will be converted to the formart your need, if special requriements in your platform.
- *   Please contact Ali). Both root cert(CA) and user cert should be supported.
+ * @param[in] server_cert @n Specify the sever certificate which is PEM format, and
+ *          both root cert(CA) and user cert should be supported
  * @param[in] server_cert_len @n Length of sever certificate, in bytes.
- * @return
-   @verbatim
-   != NULL, SSL handle.
-   = NULL, failed.
-   @endverbatim
+ * @return SSL handle.
  * @see None.
  * @note None.
  */
@@ -630,18 +605,14 @@ int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length);
  * @see None.
  * @note blocking API.
  */
-int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length);
+int platform_ssl_recv(_IN_ void *ssl, _IN_ char *buffer, _IN_ int length);
 
 
 /**
  * @brief Closes an existing ssl connection.
  *
  * @param[in] ssl: @n the specified connection.
- * @return
-   @verbatim
-   = 0, success.
-   != 0, fail.
-   @endverbatim
+ * @return None.
  * @see None.
  * @note None.
  */
@@ -652,7 +623,7 @@ int platform_ssl_close(_IN_ void *ssl);
 
 /********************************** system interface **********************************/
 
-/** @defgroup group_platform_system platform_system
+/** @defgroup group_platform_system system
  *  @{
  */
 
@@ -689,8 +660,23 @@ void platform_sys_reboot(void);
  * @see None.
  * @note None.
  */
-unsigned int platform_get_time_ms(void);
+uint32_t platform_get_time_ms(void);
 
+typedef struct {
+   int tm_sec;         /* seconds */
+   int tm_min;         /* minutes */
+   int tm_hour;        /* hours */
+   int tm_mday;        /* day of the month */
+   int tm_mon;         /* month */
+   int tm_year;        /* year */
+   int tm_wday;        /* day of the week */
+   int tm_yday;        /* day in the year */
+   int tm_isdst;       /* daylight saving time */
+}os_time_struct;
+
+uint64_t platform_get_utc_time(_INOUT_ uint64_t *p_utc);
+
+os_time_struct *platform_local_time_r(const _IN_ uint64_t *p_utc,_OUT_ os_time_struct *p_result);
 
 /**
  * @brief get the available memroy size in bytes
@@ -707,7 +693,7 @@ int platform_get_free_memory_size(void);
 
 /***************************** firmware upgrade interface *****************************/
 
-/** @defgroup group_platform_firmware_upgrade platform_firmware_upgrade
+/** @defgroup group_platform_ota ota
  *  @{
  */
 
@@ -720,8 +706,7 @@ int platform_get_free_memory_size(void);
  * @see None.
  * @note None.
  */
-void platform_firmware_upgrade_start(void);
-
+void platform_flash_program_start(void);
 
 
 /**
@@ -733,8 +718,7 @@ void platform_firmware_upgrade_start(void);
  * @see None.
  * @note None.
  */
-int platform_firmware_upgrade_write(_IN_ char *buffer, _IN_ uint32_t length);
-
+int platform_flash_program_write_block(_IN_ char *buffer, _IN_ uint32_t length);
 
 
 /**
@@ -746,14 +730,14 @@ int platform_firmware_upgrade_write(_IN_ char *buffer, _IN_ uint32_t length);
  * @see None.
  * @note None.
  */
-int platform_firmware_upgrade_finish(void);
+int platform_flash_program_stop(void);
 
 
 /** @} */ //end of platform_firmware_upgrade
 
 /************************************ io interface ************************************/
 
-/** @defgroup group_platform_io platform_io
+/** @defgroup group_platform_io io 
  *  @{
  */
 
@@ -775,16 +759,27 @@ void platform_printf(_IN_ const char *fmt, ...);
 
 /********************************** config interface **********************************/
 
-/** @defgroup group_platform_config platform_config
+/** @defgroup group_platform_config config
  *  @{
  */
 
-#define PLATFORM_CONFIG_SIZE    (2048)
+/**
+ * @brief Get flash(R/W) storage directory path.
+ * 	alink SDK use this path to store data profile
+ *
+ * @param None.
+ * @return return storage path.
+ * @see None.
+ * @note None.
+ */
+	const char *platform_get_storage_directory(void);
+
+#define PLATFORM_CONFIG_SIZE	(2048)
 
 /**
  * @brief Read configure data from the start of configure zone.
  *
- * @param[out] buffer @n A pointer to a buffer to receive incoming data.
+ * @param[in] buffer @n A pointer to a buffer to receive incoming data.
  * @param[in] length @n Specify read length, in bytes.
  * @return
    @verbatim
@@ -794,7 +789,7 @@ void platform_printf(_IN_ const char *fmt, ...);
  * @see None.
  * @note None.
  */
-int platform_config_read(_OUT_ char *buffer, _IN_ int length);
+int platform_config_read(char *buffer, int length);
 
 
 /**
@@ -810,28 +805,28 @@ int platform_config_read(_OUT_ char *buffer, _IN_ int length);
  * @see None.
  * @note None.
  */
-int platform_config_write(_IN_ const char *buffer, _IN_ int length);
+int platform_config_write(const char *buffer, int length);
 
 
 /** @} */ //end of platform_config
 
 /******************************** wifi module interface ********************************/
 
-/** @defgroup group_platform_wifi_module platform_wifi_module
+/** @defgroup group_platform_wifi_module wifi related
  *  @{
  */
 
-
-#define PLATFORM_MODULE_NAME_LEN   STR_SHORT_LEN
+   
+#define PLATFORM_MODULE_NAME_LEN   (32 + 1)
 /**
- * @brief Get wifi module name.
+ * @brief Get model of the wifi module.
  *
- * @param[out] model_str @n Buffer for using to store model string.
+ * @param[in] model_str @n Buffer for using to store model string.
  * @return  A pointer to the start address of model_str.
  * @see None.
  * @note None.
  */
-char *platform_get_module_name(_OUT_ char name_str[PLATFORM_MODULE_NAME_LEN]);
+char *platform_get_module_name(char name_str[PLATFORM_MODULE_NAME_LEN]);
 
 
 /**
@@ -844,8 +839,18 @@ char *platform_get_module_name(_OUT_ char name_str[PLATFORM_MODULE_NAME_LEN]);
  */
 int platform_wifi_get_rssi_dbm(void);
 
+/**
+ * @brief Get WIFI received signal strength indication(rssi).
+ *
+ * @param None.
+ * @return The level number, in dBm.
+ * @see None.
+ * @note None.
+ */
+int platform_rf433_get_rssi_dbm(void);
 
-#define PLATFORM_MAC_LEN    (17 + 1)
+
+#define PLATFORM_MAC_LEN	(17 + 1)
 /**
  * @brief Get WIFI MAC string with format like: xx:xx:xx:xx:xx:xx.
  *
@@ -854,24 +859,20 @@ int platform_wifi_get_rssi_dbm(void);
  * @see None.
  * @note None.
  */
-char *platform_wifi_get_mac(_OUT_ char mac_str[PLATFORM_MAC_LEN]);
+char *platform_wifi_get_mac(char mac_str[PLATFORM_MAC_LEN]);
 
 
 #define PLATFORM_IP_LEN    (15 + 1)
 /**
- * @brief Get WIFI IP string with format like: xx.xx.xx.xx,
+ * @brief Get WIFI IP string with format like: xx:xx:xx:xx:xx:xx,
    and return IP with binary form, in network byte order.
  *
  * @param[out] ip_str @n Buffer for using to store IP string, in numbers-and-dots notation form.
- * @return
-   @verbatim
-   = 0, failed.
-   != 0, IP address with hex form, in network byte order.
-   @endverbatim
+ * @return IP with binary form, in network byte order.
  * @see None.
  * @note None.
  */
-uint32_t platform_wifi_get_ip(_OUT_ char ip_str[PLATFORM_IP_LEN]);
+uint32_t platform_wifi_get_ip(char ip_str[PLATFORM_IP_LEN]);
 
 
 #define PLATFORM_CID_LEN (64 + 1)
@@ -883,20 +884,20 @@ uint32_t platform_wifi_get_ip(_OUT_ char ip_str[PLATFORM_IP_LEN]);
  * @see None.
  * @note None.
  */
-char *platform_get_chipid(_OUT_ char cid_str[PLATFORM_CID_LEN]);
+char *platform_get_chipid(char cid_str[PLATFORM_CID_LEN]);
 
 
 
-#define PLATFORM_OS_VERSION_LEN     STR_SHORT_LEN
+#define PLATFORM_OS_VERSION_LEN     (32 + 1)
 /**
  * @brief Get the os version of wifi module firmware.
  *
- * @param[out] version_str @n Buffer for using to store version string.
+ * @param[in] version_str @n Buffer for using to store version string.
  * @return  A pointer to the start address of version_str.
  * @see None.
  * @note None.
  */
-char *platform_get_os_version(_OUT_ char version_str[PLATFORM_OS_VERSION_LEN]);
+char *platform_get_os_version(char version_str[PLATFORM_OS_VERSION_LEN]);
 
 
 /** @} */ //end of platform_wifi_module
@@ -904,7 +905,7 @@ char *platform_get_os_version(_OUT_ char version_str[PLATFORM_OS_VERSION_LEN]);
 
 /************************* awss(alink wireless setup service) interface ***************************/
 
-/** @defgroup group_platform_awss platform_awss(alink wireless setup service)
+/** @defgroup group_platform_awss alink wireless setup service(awss)
  *  @{
  */
 
@@ -932,39 +933,35 @@ int platform_awss_get_timeout_interval_ms(void);
 int platform_awss_get_channelscan_interval_ms(void);
 
 
-
 /* link type */
-typedef enum AWSS_LINK_TYPE {
+enum AWSS_LINK_TYPE {
     /*< rtos platform choose this type */
-    AWSS_LINK_TYPE_NONE,
+	AWSS_LINK_TYPE_NONE,
 
     /*< linux platform may choose the following type */
-    AWSS_LINK_TYPE_PRISM,
-    AWSS_LINK_TYPE_80211_RADIO,
-    AWSS_LINK_TYPE_80211_RADIO_AVS
-} platform_awss_link_type_t;
-
-
+	AWSS_LINK_TYPE_PRISM,
+	AWSS_LINK_TYPE_80211_RADIO,
+	AWSS_LINK_TYPE_80211_RADIO_AVS
+};
 /**
- * @brief 80211 frame handler, passing 80211 frame to this function
+ * @brief 80211 frame handler, passing 80211 frame to this func
  *
  * @param[in] buf @n 80211 frame buffer
  * @param[in] length @n 80211 frame buffer length
  * @param[in] link_type @n AWSS_LINK_TYPE_NONE for most rtos platform,
-     and for linux platform, do the following step to check
-     which header type the driver supported.
+ *              and for linux platform, do the following step to check
+ *              which header type the driver supported.
    @verbatim
-   a) iwconfig wlan0 mode monitor  #open monitor mode
-   b) iwconfig wlan0 channel 6 #switch channel 6
-   c) tcpdump -i wlan0 -s0 -w file.pacp  #capture 80211 frame & save
-   d) open file.pacp with wireshark or omnipeek£¬
-      check the link header type and fcs included or not.
+           	a) iwconfig wlan0 mode monitor	#open monitor mode
+           	b) iwconfig wlan0 channel 6	#switch channel 6
+           	c) tcpdump -i wlan0 -s0 -w file.pacp	#capture 80211 frame & save
+           	d) open file.pacp with wireshark or omnipeek
+           	    check the link header type and fcs included or not
    @endverbatim
- *@param[in] with_fcs @n 80211 frame buffer include fcs(4 byte) or not
- *                                                                                */
+ * @param[in] with_fcs @n 80211 frame buffer include fcs(4 byte) or not
+ */
 typedef int (*platform_awss_recv_80211_frame_cb_t)(char *buf, int length,
-        platform_awss_link_type_t link_type, int with_fcs);
-
+        enum AWSS_LINK_TYPE link_type, int with_fcs);
 
 /**
  * @brief Set wifi running at monitor mode,
@@ -975,7 +972,7 @@ typedef int (*platform_awss_recv_80211_frame_cb_t)(char *buf, int length,
  * @see None.
  * @note None.
  */
-void platform_awss_open_monitor(_IN_ platform_awss_recv_80211_frame_cb_t cb);
+void platform_awss_open_monitor(platform_awss_recv_80211_frame_cb_t cb);
 
 
 
@@ -992,22 +989,80 @@ void platform_awss_close_monitor(void);
 
 
 #ifndef ETH_ALEN
-#define ETH_ALEN        (6)
+#define ETH_ALEN		(6)
 #endif
 /**
  * @brief Switch to specific wifi channel.
  *
  * @param[in] primary_channel @n Primary channel.
- * @param[in] secondary_channel @n Auxiliary channel.
- * @param[in] bssid @n A pointer to wifi BSSID.
+ * @param[in] secondary_channel @n Auxiliary channel if 40Mhz channel is supported, currently
+ *              this param is always 0.
+ * @param[in] bssid @n A pointer to wifi BSSID on which awss lock the channel, most platform
+ *              may ignore it.
  * @return None.
  * @see None.
- * @note None.
+ * @note None. 
  */
 void platform_awss_switch_channel(
-    _IN_ char primary_channel,
-    _IN_ char secondary_channel,
-    _IN_ char bssid[ETH_ALEN]);
+		_IN_ char primary_channel,
+		_IN_OPT_ char secondary_channel,
+		_IN_OPT_ char bssid[ETH_ALEN]);
+
+/* ssid: 32 octets at most, include the NULL-terminated */
+#define PLATFORM_MAX_SSID_LEN			(32 + 1)
+/* password: 8-63 ascii */
+#define PLATFORM_MAX_PASSWD_LEN			(64 + 1)
+
+/* auth type */
+enum AWSS_AUTH_TYPE {
+	AWSS_AUTH_TYPE_OPEN,
+	AWSS_AUTH_TYPE_SHARED,
+	AWSS_AUTH_TYPE_WPAPSK,
+	AWSS_AUTH_TYPE_WPA8021X,
+	AWSS_AUTH_TYPE_WPA2PSK,
+	AWSS_AUTH_TYPE_WPA28021X,
+	AWSS_AUTH_TYPE_WPAPSKWPA2PSK,
+	AWSS_AUTH_TYPE_MAX = AWSS_AUTH_TYPE_WPAPSKWPA2PSK,
+	AWSS_AUTH_TYPE_INVALID = 0xff,
+};
+
+/* encry type */
+enum AWSS_ENC_TYPE {
+	AWSS_ENC_TYPE_NONE,
+	AWSS_ENC_TYPE_WEP,
+	AWSS_ENC_TYPE_TKIP,
+	AWSS_ENC_TYPE_AES,
+	AWSS_ENC_TYPE_TKIPAES,
+	AWSS_ENC_TYPE_MAX = AWSS_ENC_TYPE_TKIPAES,
+	AWSS_ENC_TYPE_INVALID = 0xff,
+};
+
+/**
+ * @brief Wifi AP connect function
+ *
+ * @param[in] connection_timeout_ms @n AP connection timeout in ms or PLATFORM_WAIT_INFINITE
+ * @param[in] ssid @n AP ssid
+ * @param[in] passwd @n AP passwd
+ * @param[in] auth @n optional(AWSS_AUTH_TYPE_INVALID), AP auth info 
+ * @param[in] encry @n optional(AWSS_ENC_TYPE_INVALID), AP encry info
+ * @param[in] bssid @n optional(NULL or zero mac address), AP bssid info
+ * @param[in] channel @n optional, AP channel info
+ * @return
+   @verbatim
+     = 0: connect AP & DHCP success
+     = -1: connect AP or DHCP fail/timeout
+   @endverbatim
+ * @see None.
+ * @note None. 
+ */
+int platform_awss_connect_ap(
+        _IN_ uint32_t connection_timeout_ms,
+        _IN_ char ssid[PLATFORM_MAX_SSID_LEN],
+        _IN_ char passwd[PLATFORM_MAX_PASSWD_LEN],
+        _IN_OPT_ enum AWSS_AUTH_TYPE auth,
+        _IN_OPT_ enum AWSS_ENC_TYPE encry,
+        _IN_OPT_ uint8_t bssid[ETH_ALEN],
+        _IN_OPT_ uint8_t channel);
 
 /** @} */ //end of platform__awss
 
@@ -1019,5 +1074,3 @@ void platform_awss_switch_channel(
 #endif
 
 #endif
-
-

@@ -55,7 +55,6 @@
 #include "esp_log.h"
 
 #include "alink_export.h"
-#include "alink_export_rawdata.h"
 #include "platform.h"
 #include "product.h"
 

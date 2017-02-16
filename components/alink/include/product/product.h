@@ -1,42 +1,43 @@
 
-
 #ifndef __HV_PLATFORM_H__
 #define __HV_PLATFORM_H__
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-#include "platform/platform.h"
-#include "alink_export.h"
+#include "platform.h"
 #include "esp_alink.h"
 
-/** @defgroup group_product group_product
+/** @defgroup group_product product
  *  @{
  */
 
-/** @defgroup group_product_macro product_macro
- *  @{
- */
+#define PRODUCT_SN_LEN			(64 + 1)
+#define PRODUCT_MODEL_LEN		(80 + 1)
+#define PRODUCT_KEY_LEN			(20 + 1)
+#define PRODUCT_SECRET_LEN		(40 + 1)
+#define PRODUCT_UUID_LEN		(32 + 1)
+#define PRODUCT_VERSION_LEN     (16 + 1)
+#define PRODUCT_NAME_LEN        (32 + 1)
+#define PRODUCT_ASR_APP_KEY_LEN (64)
 
-
-#define PRODUCT_SN_LEN		STR_SN_LEN    //(64 + 1)
-#define PRODUCT_MODEL_LEN	STR_MODEL_LEN //(80 + 1)
-#define PRODUCT_KEY_LEN		STR_KEY_LEN   //(20 + 1)
-#define PRODUCT_SECRET_LEN	STR_SEC_LEN	  //(40 + 1)
-#define PRODUCT_UUID_LEN	STR_UUID_LEN  //(32 + 1)
-#define PRODUCT_VERSION_LEN STR_NAME_LEN  //(16 + 1)
-#define PRODUCT_NAME_LEN    STR_NAME_LEN  //(32 + 1)
-
-/** @} */ // end of product_macro
-
-
-
-/** @defgroup group_product_all product_all
- *  @{
- */
-
+#define PRODUCT_CID_LEN			(64 + 1)
+typedef struct alink_product {
+    /* optional */
+    char name[PRODUCT_NAME_LEN];
+    char model[PRODUCT_MODEL_LEN];
+    char version[PRODUCT_NAME_LEN];
+    char type[PRODUCT_NAME_LEN];
+    char category[PRODUCT_NAME_LEN];
+    char manufacturer[PRODUCT_NAME_LEN];
+    char cid[PRODUCT_CID_LEN];
+    char sn[PRODUCT_SN_LEN];
+    char key[PRODUCT_KEY_LEN];
+    char secret[PRODUCT_SECRET_LEN];
+    char key_sandbox[PRODUCT_KEY_LEN];
+    char secret_sandbox[PRODUCT_SECRET_LEN];
+}alink_product_t;
 
 /**
  * @brief Get the product version string.
@@ -46,7 +47,7 @@ extern "C"
  * @see None.
  * @note
  */
-alink_err_t product_get(_OUT_ struct device_info *product_info);
+alink_err_t product_get(_OUT_ void *product_info);
 
 /**
  * @brief Get the product version string.
@@ -56,7 +57,7 @@ alink_err_t product_get(_OUT_ struct device_info *product_info);
  * @see None.
  * @note
  */
-alink_err_t product_set(_IN_ const struct device_info *product_info);
+alink_err_t product_set(_IN_ const void *product_info);
 
 
 
@@ -90,11 +91,6 @@ char *product_get_name(char name_str[PRODUCT_NAME_LEN]);
  */
 char *product_get_sn(char sn_str[PRODUCT_SN_LEN]);
 
-
-
-
-
-
 /**
  * @brief Get product model string.
  *
@@ -104,8 +100,6 @@ char *product_get_sn(char sn_str[PRODUCT_SN_LEN]);
  * @note None.
  */
 char *product_get_model(char model_str[PRODUCT_MODEL_LEN]);
-
-
 
 /**
  * @brief Get product key string.
@@ -117,8 +111,6 @@ char *product_get_model(char model_str[PRODUCT_MODEL_LEN]);
  */
 char *product_get_key(char key_str[PRODUCT_KEY_LEN]);
 
-
-
 /**
  * @brief Get product secret string.
  *
@@ -128,8 +120,6 @@ char *product_get_key(char key_str[PRODUCT_KEY_LEN]);
  * @note None.
  */
 char *product_get_secret(char secret_str[PRODUCT_SECRET_LEN]);
-
-
 
 /**
  * @brief Get product debug key string.
@@ -141,8 +131,6 @@ char *product_get_secret(char secret_str[PRODUCT_SECRET_LEN]);
  */
 char *product_get_debug_key(char key_str[PRODUCT_KEY_LEN]);
 
-
-
 /**
  * @brief Get product debug secret string.
  *
@@ -152,22 +140,17 @@ char *product_get_debug_key(char key_str[PRODUCT_KEY_LEN]);
  * @note None.
  */
 char *product_get_debug_secret(char secret_str[PRODUCT_SECRET_LEN]);
-char *product_get_type(char type_str[STR_NAME_LEN]);
-char *product_get_category(char category_str[STR_NAME_LEN]);
-char *product_get_manufacturer(char manufacturer_str[STR_NAME_LEN]);
-char *product_get_cid(char cid_str[STR_CID_LEN]);
-
-/** @} */ // end of product_all
 
 
-/** @} */ // end of group_product
+char *product_get_asr_appkey(char app_key[PRODUCT_ASR_APP_KEY_LEN]);
 
 
+char *product_get_audio_format();
+
+
+/** @} */// end of group_product
 
 #ifdef __cplusplus
 }
 #endif
-
 #endif
-
-

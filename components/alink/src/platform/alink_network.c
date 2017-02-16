@@ -30,7 +30,7 @@ static alink_err_t network_create_socket( pplatform_netaddr_t netaddr, int type,
         ip = htonl(INADDR_ANY);
     } else {
         hp = gethostbyname(netaddr->host);
-        ALINK_ERROR_CHECK(hp == NULL, ALINK_SOCKET_ERR, "gethostbyname ret:%p", hp);
+        ALINK_ERROR_CHECK(hp == NULL, ALINK_ERR, "gethostbyname ret:%p", hp);
 
         struct ip4_addr *ip4_addr = (struct ip4_addr *)hp->h_addr;
         char ipaddr_tmp[64] = {0};
@@ -46,7 +46,7 @@ static alink_err_t network_create_socket( pplatform_netaddr_t netaddr, int type,
 
     int opt_val = 1;
     ret = setsockopt(*psock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val));
-    ALINK_ERROR_CHECK(ret != 0, ALINK_SOCKET_ERR, "setsockopt SO_REUSEADDR errno: %d", errno);
+    ALINK_ERROR_CHECK(ret != 0, ALINK_ERR, "setsockopt SO_REUSEADDR errno: %d", errno);
 
     paddr->sin_addr.s_addr = ip;
     paddr->sin_family = AF_INET;

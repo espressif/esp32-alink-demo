@@ -197,7 +197,7 @@ alink_err_t alink_connect_ap()
             goto EXIT;
         }
     }
-    aws_destroy();
+    // aws_destroy();
 
     ALINK_LOGI("*********************************");
     ALINK_LOGI("*       ENTER SOFTAP MODE       *");
@@ -212,8 +212,9 @@ alink_err_t alink_connect_ap()
     return ALINK_ERR;
 EXIT:
     alink_write_wifi_config(&wifi_config);
-    aws_notify_app();
-    aws_destroy();
+    awss_stop();
+    // aws_notify_app();
+    // aws_destroy();
     return ALINK_OK;
 }
 
@@ -223,7 +224,7 @@ EXIT:
  * Parameters   : none
  * Returns      : none
 *******************************************************************************/
-void esp_alink_init(_IN_ const struct device_info *product_info)
+void esp_alink_init(_IN_ const void *product_info)
 {
     alink_key_init(ALINK_RESET_KEY_IO);
     xTaskCreate(factory_reset, "factory_reset", 1024 * 4, NULL, 10, NULL);

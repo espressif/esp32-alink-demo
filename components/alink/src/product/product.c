@@ -27,19 +27,19 @@
 #include "product/product.h"
 static const char *TAG = "alink_product";
 
-static struct device_info g_device_info;
+static alink_product_t g_device_info;
 
-alink_err_t product_get(_OUT_ struct device_info *product_info)
+alink_err_t product_get(_OUT_ void *product_info)
 {
     ALINK_PARAM_CHECK(product_info == NULL);
-    memcpy(product_info, &g_device_info, sizeof(struct device_info));
+    memcpy(product_info, &g_device_info, sizeof(alink_product_t));
     return ALINK_OK;
 }
 
-alink_err_t product_set(_IN_ const struct device_info *product_info)
+alink_err_t product_set(_IN_ const void *product_info)
 {
     ALINK_PARAM_CHECK(product_info == NULL);
-    memcpy(&g_device_info, product_info, sizeof(struct device_info));
+    memcpy(&g_device_info, product_info, sizeof(alink_product_t));
     return ALINK_OK;
 }
 
@@ -83,26 +83,22 @@ char *product_get_sn(char sn_str[PRODUCT_SN_LEN])
     return memcpy(sn_str, g_device_info.sn, PRODUCT_SN_LEN);
 }
 
-
-char *product_get_type(char type_str[STR_NAME_LEN])
+char *product_get_type(char type_str[PRODUCT_NAME_LEN])
 {
-    return memcpy(type_str, g_device_info.type, STR_NAME_LEN);
+    return memcpy(type_str, g_device_info.type, PRODUCT_NAME_LEN);
 }
 
-char *product_get_category(char category_str[STR_NAME_LEN])
+char *product_get_category(char category_str[PRODUCT_NAME_LEN])
 {
-    return memcpy(category_str, g_device_info.category, STR_NAME_LEN);
+    return memcpy(category_str, g_device_info.category, PRODUCT_NAME_LEN);
 }
 
-char *product_get_manufacturer(char manufacturer_str[STR_NAME_LEN])
+char *product_get_manufacturer(char manufacturer_str[PRODUCT_NAME_LEN])
 {
-    return memcpy(manufacturer_str, g_device_info.manufacturer, STR_NAME_LEN);
+    return memcpy(manufacturer_str, g_device_info.manufacturer, PRODUCT_NAME_LEN);
 }
 
-char *product_get_cid(char cid_str[STR_CID_LEN])
+char *product_get_cid(char cid_str[PRODUCT_CID_LEN])
 {
-    return memcpy(cid_str, g_device_info.cid, STR_CID_LEN);
+    return memcpy(cid_str, g_device_info.cid, PRODUCT_CID_LEN);
 }
-
-
-

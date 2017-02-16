@@ -107,7 +107,7 @@ void app_main()
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
 
-    struct device_info product_info = {
+    alink_product_t product_info = {
         .sn             = "12345678",
         .name           = "ALINKTEST",
         .type           = "LIGHT",
@@ -121,6 +121,7 @@ void app_main()
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
     };
+
 
     ALINK_LOGI("*********************************");
     ALINK_LOGI("*         PRODUCT INFO          *");
