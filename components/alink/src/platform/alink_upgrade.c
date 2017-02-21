@@ -36,7 +36,7 @@ static const char *TAG = "alink_upgrade";
 static esp_ota_handle_t out_handle = 0;
 static esp_partition_t operate_partition;
 
-void platform_firmware_upgrade_start(void)
+void platform_flash_program_start(void)
 {
     esp_err_t err;
     const esp_partition_t *esp_current_partition = esp_ota_get_boot_partition();
@@ -72,7 +72,7 @@ void platform_firmware_upgrade_start(void)
     ALINK_LOGI("esp_ota_begin init OK");
 }
 
-int platform_firmware_upgrade_write(char *buffer, uint32_t length)
+int platform_flash_program_write_block(char *buffer, uint32_t length)
 {
     ALINK_PARAM_CHECK(length <= 0);
     ALINK_PARAM_CHECK(buffer == NULL);
@@ -92,7 +92,7 @@ int platform_firmware_upgrade_write(char *buffer, uint32_t length)
     return 0;
 }
 
-int platform_firmware_upgrade_finish(void)
+int platform_flash_program_stop(void)
 {
     esp_err_t err;
     err = esp_ota_end(out_handle);

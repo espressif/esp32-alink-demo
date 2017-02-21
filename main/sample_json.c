@@ -22,11 +22,12 @@
 #include "nvs_flash.h"
 
 #include "esp_alink.h"
+#include "product.h"
 #include "cJSON.h"
 
 #ifndef ALINK_PASSTHROUGH
 static const char *TAG = "app_main";
-SemaphoreHandle_t xSemWrite = NULL;
+SemaphoreHandle_t xSemWriteInfo = NULL;
 
 /*do your job here*/
 struct virtual_dev {
@@ -55,8 +56,8 @@ void read_task_test(void *arg)
         int attrLen = 0, valueLen = 0, value = 0, i = 0;
         char *valueStr = NULL, *attrStr = NULL;
         for (i = 0; i < 5; i++) {
-            attrStr = alink_JsonGetValueByName(down_cmd, strlen(down_cmd), device_attr[i], &attrLen, 0);
-            valueStr = alink_JsonGetValueByName(attrStr, attrLen, "value", &valueLen, 0);
+            attrStr = json_get_value_by_name(down_cmd, strlen(down_cmd), device_attr[i], &attrLen, 0);
+            valueStr = json_get_value_by_name(attrStr, attrLen, "value", &valueLen, 0);
 
             if (valueStr && valueLen > 0) {
                 char lastChar = *(valueStr + valueLen);
@@ -84,7 +85,7 @@ void read_task_test(void *arg)
                 }
             }
         }
-        xSemaphoreGive(xSemWrite);
+        xSemaphoreGive(xSemWriteInfo);
     }
     free(down_cmd);
     vTaskDelete(NULL);
@@ -95,14 +96,14 @@ void write_task_test(void *arg)
     alink_err_t ret = ALINK_ERR;
     char *up_cmd = (char *)malloc(ALINK_DATA_LEN);
     for (;;) {
-        xSemaphoreTake(xSemWrite, portMAX_DELAY);
+        xSemaphoreTake(xSemWriteInfo, portMAX_DELAY);
         memset(up_cmd, 0, ALINK_DATA_LEN);
         sprintf(up_cmd, main_dev_params, virtual_device.power,
                 virtual_device.temp_value, virtual_device.light_value,
                 virtual_device.time_delay, virtual_device.work_mode);
         ret = esp_write(up_cmd, ALINK_DATA_LEN, 500 / portTICK_PERIOD_MS);
         if (ret == ALINK_ERR) ALINK_LOGW("esp_write is err");
-        // platform_msleep(500);
+        platform_msleep(500);
     }
     free(up_cmd);
     vTaskDelete(NULL);
@@ -125,19 +126,19 @@ void app_main()
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
 
-    struct device_info product_info = {
+    alink_product_t product_info = {
         .sn             = "12345678",
         .name           = "ALINKTEST",
-        .type           = "LIGHT",
-        .category       = "LIVING",
-        .manufacturer   = "ALINKTEST",
         .version        = "1.0.0",
         .model          = "ALINKTEST_LIVING_LIGHT_SMARTLED",
-        .cid            = "2D0044000F47333139373038",
         .key            = "ljB6vqoLzmP8fGkE6pon",
         .secret         = "YJJZjytOCXDhtQqip4EjWbhR95zTgI92RVjzjyZF",
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
+        // .type           = "LIGHT",
+        // .category       = "LIVING",
+        // .manufacturer   = "ALINKTEST",
+        // .cid            = "2D0044000F47333139373038",
     };
 
     ALINK_LOGI("*********************************");
@@ -149,7 +150,7 @@ void app_main()
     ALINK_LOGI("model  : %s", product_info.model);
     esp_alink_init(&product_info);
 
-    if (xSemWrite == NULL) xSemWrite = xSemaphoreCreateBinary();
+    if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
     xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 4, NULL);
     ALINK_LOGI("free_heap3:%u\n", esp_get_free_heap_size());

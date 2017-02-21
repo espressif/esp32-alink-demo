@@ -40,15 +40,15 @@ extern "C"
 #define USE_STDINT_H
 
 #ifdef USE_STDINT_H
-    #include <stdint.h>
+#include <stdint.h>
 #else
-    typedef signed char     int8_t;
-    typedef signed short    int16_t;
-    typedef signed int     int32_t;
-    typedef unsigned char   uint8_t;
-    typedef unsigned short  uint16_t;
-    typedef unsigned int       uint32_t;
-    typedef unsigned long long uint64_t;
+typedef signed   char  int8_t;
+typedef signed   short int16_t;
+typedef signed   int   int32_t;
+typedef unsigned char  uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int   uint32_t;
+typedef unsigned long  long      uint64_t;
 #endif
 
 /** @defgroup group_platform platform
@@ -56,20 +56,20 @@ extern "C"
  */
 
 
-#define _IN_			/**< indicate that this is a input parameter. */
-#define _OUT_			/**< indicate that this is a output parameter. */
-#define _INOUT_			/**< indicate that this is a io parameter. */
-#define _IN_OPT_		/**< indicate that this is a optional input parameter. */
-#define _OUT_OPT_		/**< indicate that this is a optional output parameter. */
-#define _INOUT_OPT_		/**< indicate that this is a optional io parameter. */
+#define _IN_            /**< indicate that this is a input parameter. */
+#define _OUT_           /**< indicate that this is a output parameter. */
+#define _INOUT_         /**< indicate that this is a io parameter. */
+#define _IN_OPT_        /**< indicate that this is a optional input parameter. */
+#define _OUT_OPT_       /**< indicate that this is a optional output parameter. */
+#define _INOUT_OPT_     /**< indicate that this is a optional io parameter. */
 
 
-#define PLATFORM_SOCKET_MAXNUMS			(10)
-#define PLATFORM_WAIT_INFINITE			(~0)
-#define PLATFORM_INVALID_FD			((void *)-1)
+#define PLATFORM_SOCKET_MAXNUMS (10)
+#define PLATFORM_WAIT_INFINITE  (~0)
+#define PLATFORM_INVALID_FD     ((void *)-1)
 
-#define STR_SHORT_LEN                   (32)
-#define STR_LONG_LEN                    (128)
+#define STR_SHORT_LEN           (32)
+#define STR_LONG_LEN            (128)
 
 
 /*********************************** thread interface ***********************************/
@@ -84,7 +84,7 @@ extern "C"
  * @param[out] thread @n The new thread handle.
  * @param[in] name @n thread name.
  * @param[in] start_routine @n A pointer to the application-defined function to be executed by the thread.
-		This pointer represents the starting address of the thread.
+        This pointer represents the starting address of the thread.
  * @param[in] arg @n A pointer to a variable to be passed to the start_routine.
  * @param[in] stack @n A pointer to stack buffer malloced by caller, if platform used this buffer, set stack_used to non-zero value,  otherwise set it to 0.
  * @param[in] stack_size @n The initial size of the stack, in bytes. see platform_get_thread_stack_size().
@@ -98,13 +98,13 @@ extern "C"
  * @note None.
  */
 int platform_thread_create(
-		_OUT_ void **thread,
-		_IN_ const char *name,
-		_IN_ void *(*start_routine) (void *),
-		_IN_ void *arg,
-		_IN_ void *stack,
-		_IN_ uint32_t stack_size,
-		_OUT_ int *stack_used);
+    _OUT_ void **thread,
+    _IN_ const char *name,
+    _IN_ void *(*start_routine) (void *),
+    _IN_ void *arg,
+    _IN_ void *stack,
+    _IN_ uint32_t stack_size,
+    _OUT_ int *stack_used);
 
 /**
  * @brief exit the thread itself.
@@ -308,8 +308,8 @@ void platform_free(_IN_ void *ptr);
  */
 typedef struct
 {
-	char *host; /**< host ip(dotted-decimal notation) or host name(string) */
-	uint16_t port; /**< udp port or tcp port */
+    char *host; /**< host ip(dotted-decimal notation) or host name(string) */
+    uint16_t port; /**< udp port or tcp port */
 } platform_netaddr_t, *pplatform_netaddr_t;
 
 
@@ -390,10 +390,10 @@ void platform_udp_close(void *handle);
  * @note blocking API.
  */
 int platform_udp_sendto(
-		_IN_ void *handle,
-		_IN_ const char *buffer,
-		_IN_ uint32_t length,
-		_IN_ platform_netaddr_t *netaddr);
+    _IN_ void *handle,
+    _IN_ const char *buffer,
+    _IN_ uint32_t length,
+    _IN_ platform_netaddr_t *netaddr);
 
 
 /**
@@ -413,10 +413,10 @@ int platform_udp_sendto(
  * @note blocking API.
  */
 int platform_udp_recvfrom(
-		_IN_ void *handle,
-		_OUT_ char *buffer,
-		_IN_ uint32_t length,
-		_OUT_OPT_ platform_netaddr_t *netaddr);
+    _IN_ void *handle,
+    _OUT_ char *buffer,
+    _IN_ uint32_t length,
+    _OUT_OPT_ platform_netaddr_t *netaddr);
 
 
 
@@ -543,9 +543,9 @@ void platform_tcp_close(_IN_ void *handle);
  * @note None.
  */
 int platform_select(
-		_INOUT_OPT_ void *read_fds[PLATFORM_SOCKET_MAXNUMS],
-		_INOUT_OPT_ void *write_fds[PLATFORM_SOCKET_MAXNUMS],
-		_IN_ int timeout_ms);
+    _INOUT_OPT_ void *read_fds[PLATFORM_SOCKET_MAXNUMS],
+    _INOUT_OPT_ void *write_fds[PLATFORM_SOCKET_MAXNUMS],
+    _IN_ int timeout_ms);
 
 
 /** @} */ //end of platform_network
@@ -663,20 +663,20 @@ void platform_sys_reboot(void);
 uint32_t platform_get_time_ms(void);
 
 typedef struct {
-   int tm_sec;         /* seconds */
-   int tm_min;         /* minutes */
-   int tm_hour;        /* hours */
-   int tm_mday;        /* day of the month */
-   int tm_mon;         /* month */
-   int tm_year;        /* year */
-   int tm_wday;        /* day of the week */
-   int tm_yday;        /* day in the year */
-   int tm_isdst;       /* daylight saving time */
-}os_time_struct;
+    int tm_sec;         /* seconds */
+    int tm_min;         /* minutes */
+    int tm_hour;        /* hours */
+    int tm_mday;        /* day of the month */
+    int tm_mon;         /* month */
+    int tm_year;        /* year */
+    int tm_wday;        /* day of the week */
+    int tm_yday;        /* day in the year */
+    int tm_isdst;       /* daylight saving time */
+} os_time_struct;
 
 uint64_t platform_get_utc_time(_INOUT_ uint64_t *p_utc);
 
-os_time_struct *platform_local_time_r(const _IN_ uint64_t *p_utc,_OUT_ os_time_struct *p_result);
+os_time_struct *platform_local_time_r(const _IN_ uint64_t *p_utc, _OUT_ os_time_struct *p_result);
 
 /**
  * @brief get the available memroy size in bytes
@@ -737,7 +737,7 @@ int platform_flash_program_stop(void);
 
 /************************************ io interface ************************************/
 
-/** @defgroup group_platform_io io 
+/** @defgroup group_platform_io io
  *  @{
  */
 
@@ -765,16 +765,16 @@ void platform_printf(_IN_ const char *fmt, ...);
 
 /**
  * @brief Get flash(R/W) storage directory path.
- * 	alink SDK use this path to store data profile
+ *  alink SDK use this path to store data profile
  *
  * @param None.
  * @return return storage path.
  * @see None.
  * @note None.
  */
-	const char *platform_get_storage_directory(void);
+const char *platform_get_storage_directory(void);
 
-#define PLATFORM_CONFIG_SIZE	(2048)
+#define PLATFORM_CONFIG_SIZE    (2048)
 
 /**
  * @brief Read configure data from the start of configure zone.
@@ -816,7 +816,6 @@ int platform_config_write(const char *buffer, int length);
  *  @{
  */
 
-   
 #define PLATFORM_MODULE_NAME_LEN   (32 + 1)
 /**
  * @brief Get model of the wifi module.
@@ -850,7 +849,7 @@ int platform_wifi_get_rssi_dbm(void);
 int platform_rf433_get_rssi_dbm(void);
 
 
-#define PLATFORM_MAC_LEN	(17 + 1)
+#define PLATFORM_MAC_LEN    (17 + 1)
 /**
  * @brief Get WIFI MAC string with format like: xx:xx:xx:xx:xx:xx.
  *
@@ -936,12 +935,12 @@ int platform_awss_get_channelscan_interval_ms(void);
 /* link type */
 enum AWSS_LINK_TYPE {
     /*< rtos platform choose this type */
-	AWSS_LINK_TYPE_NONE,
+    AWSS_LINK_TYPE_NONE,
 
     /*< linux platform may choose the following type */
-	AWSS_LINK_TYPE_PRISM,
-	AWSS_LINK_TYPE_80211_RADIO,
-	AWSS_LINK_TYPE_80211_RADIO_AVS
+    AWSS_LINK_TYPE_PRISM,
+    AWSS_LINK_TYPE_80211_RADIO,
+    AWSS_LINK_TYPE_80211_RADIO_AVS
 };
 /**
  * @brief 80211 frame handler, passing 80211 frame to this func
@@ -952,11 +951,11 @@ enum AWSS_LINK_TYPE {
  *              and for linux platform, do the following step to check
  *              which header type the driver supported.
    @verbatim
-           	a) iwconfig wlan0 mode monitor	#open monitor mode
-           	b) iwconfig wlan0 channel 6	#switch channel 6
-           	c) tcpdump -i wlan0 -s0 -w file.pacp	#capture 80211 frame & save
-           	d) open file.pacp with wireshark or omnipeek
-           	    check the link header type and fcs included or not
+            a) iwconfig wlan0 mode monitor  #open monitor mode
+            b) iwconfig wlan0 channel 6 #switch channel 6
+            c) tcpdump -i wlan0 -s0 -w file.pacp    #capture 80211 frame & save
+            d) open file.pacp with wireshark or omnipeek
+                check the link header type and fcs included or not
    @endverbatim
  * @param[in] with_fcs @n 80211 frame buffer include fcs(4 byte) or not
  */
@@ -989,7 +988,7 @@ void platform_awss_close_monitor(void);
 
 
 #ifndef ETH_ALEN
-#define ETH_ALEN		(6)
+#define ETH_ALEN        (6)
 #endif
 /**
  * @brief Switch to specific wifi channel.
@@ -1001,40 +1000,40 @@ void platform_awss_close_monitor(void);
  *              may ignore it.
  * @return None.
  * @see None.
- * @note None. 
+ * @note None.
  */
 void platform_awss_switch_channel(
-		_IN_ char primary_channel,
-		_IN_OPT_ char secondary_channel,
-		_IN_OPT_ char bssid[ETH_ALEN]);
+    _IN_ char primary_channel,
+    _IN_OPT_ char secondary_channel,
+    _IN_OPT_ char bssid[ETH_ALEN]);
 
 /* ssid: 32 octets at most, include the NULL-terminated */
-#define PLATFORM_MAX_SSID_LEN			(32 + 1)
+#define PLATFORM_MAX_SSID_LEN           (32 + 1)
 /* password: 8-63 ascii */
-#define PLATFORM_MAX_PASSWD_LEN			(64 + 1)
+#define PLATFORM_MAX_PASSWD_LEN         (64 + 1)
 
 /* auth type */
 enum AWSS_AUTH_TYPE {
-	AWSS_AUTH_TYPE_OPEN,
-	AWSS_AUTH_TYPE_SHARED,
-	AWSS_AUTH_TYPE_WPAPSK,
-	AWSS_AUTH_TYPE_WPA8021X,
-	AWSS_AUTH_TYPE_WPA2PSK,
-	AWSS_AUTH_TYPE_WPA28021X,
-	AWSS_AUTH_TYPE_WPAPSKWPA2PSK,
-	AWSS_AUTH_TYPE_MAX = AWSS_AUTH_TYPE_WPAPSKWPA2PSK,
-	AWSS_AUTH_TYPE_INVALID = 0xff,
+    AWSS_AUTH_TYPE_OPEN,
+    AWSS_AUTH_TYPE_SHARED,
+    AWSS_AUTH_TYPE_WPAPSK,
+    AWSS_AUTH_TYPE_WPA8021X,
+    AWSS_AUTH_TYPE_WPA2PSK,
+    AWSS_AUTH_TYPE_WPA28021X,
+    AWSS_AUTH_TYPE_WPAPSKWPA2PSK,
+    AWSS_AUTH_TYPE_MAX = AWSS_AUTH_TYPE_WPAPSKWPA2PSK,
+    AWSS_AUTH_TYPE_INVALID = 0xff,
 };
 
 /* encry type */
 enum AWSS_ENC_TYPE {
-	AWSS_ENC_TYPE_NONE,
-	AWSS_ENC_TYPE_WEP,
-	AWSS_ENC_TYPE_TKIP,
-	AWSS_ENC_TYPE_AES,
-	AWSS_ENC_TYPE_TKIPAES,
-	AWSS_ENC_TYPE_MAX = AWSS_ENC_TYPE_TKIPAES,
-	AWSS_ENC_TYPE_INVALID = 0xff,
+    AWSS_ENC_TYPE_NONE,
+    AWSS_ENC_TYPE_WEP,
+    AWSS_ENC_TYPE_TKIP,
+    AWSS_ENC_TYPE_AES,
+    AWSS_ENC_TYPE_TKIPAES,
+    AWSS_ENC_TYPE_MAX = AWSS_ENC_TYPE_TKIPAES,
+    AWSS_ENC_TYPE_INVALID = 0xff,
 };
 
 /**
@@ -1043,7 +1042,7 @@ enum AWSS_ENC_TYPE {
  * @param[in] connection_timeout_ms @n AP connection timeout in ms or PLATFORM_WAIT_INFINITE
  * @param[in] ssid @n AP ssid
  * @param[in] passwd @n AP passwd
- * @param[in] auth @n optional(AWSS_AUTH_TYPE_INVALID), AP auth info 
+ * @param[in] auth @n optional(AWSS_AUTH_TYPE_INVALID), AP auth info
  * @param[in] encry @n optional(AWSS_ENC_TYPE_INVALID), AP encry info
  * @param[in] bssid @n optional(NULL or zero mac address), AP bssid info
  * @param[in] channel @n optional, AP channel info
@@ -1053,16 +1052,16 @@ enum AWSS_ENC_TYPE {
      = -1: connect AP or DHCP fail/timeout
    @endverbatim
  * @see None.
- * @note None. 
+ * @note None.
  */
 int platform_awss_connect_ap(
-        _IN_ uint32_t connection_timeout_ms,
-        _IN_ char ssid[PLATFORM_MAX_SSID_LEN],
-        _IN_ char passwd[PLATFORM_MAX_PASSWD_LEN],
-        _IN_OPT_ enum AWSS_AUTH_TYPE auth,
-        _IN_OPT_ enum AWSS_ENC_TYPE encry,
-        _IN_OPT_ uint8_t bssid[ETH_ALEN],
-        _IN_OPT_ uint8_t channel);
+    _IN_ uint32_t connection_timeout_ms,
+    _IN_ char ssid[PLATFORM_MAX_SSID_LEN],
+    _IN_ char passwd[PLATFORM_MAX_PASSWD_LEN],
+    _IN_OPT_ enum AWSS_AUTH_TYPE auth,
+    _IN_OPT_ enum AWSS_ENC_TYPE encry,
+    _IN_OPT_ uint8_t bssid[ETH_ALEN],
+    _IN_OPT_ uint8_t channel);
 
 /** @} */ //end of platform__awss
 

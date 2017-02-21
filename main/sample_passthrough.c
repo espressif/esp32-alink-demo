@@ -87,6 +87,7 @@ void write_task_test(void *arg)
                    light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
         ret = esp_write(&light_info, sizeof(dev_info_t), 500 / portTICK_PERIOD_MS);
         if (ret == ALINK_ERR) ALINK_LOGW("esp_write is err");
+        vTaskDelay(500/portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
 }
@@ -110,16 +111,16 @@ void app_main()
     alink_product_t product_info = {
         .sn             = "12345678",
         .name           = "ALINKTEST",
-        .type           = "LIGHT",
-        .category       = "LIVING",
-        .manufacturer   = "ALINKTEST",
         .version        = "1.0.0",
         .model          = "ALINKTEST_LIVING_LIGHT_SMARTLED_LUA",
-        .cid            = "2D0044000F47333139373038",
         .key            = "bIjq3G1NcgjSfF9uSeK2",
         .secret         = "W6tXrtzgQHGZqksvJLMdCPArmkecBAdcr2F5tjuF",
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
+        // .type           = "LIGHT",
+        // .category       = "LIVING",
+        // .manufacturer   = "ALINKTEST",
+        // .cid            = "2D0044000F47333139373038",
     };
 
 
@@ -127,7 +128,6 @@ void app_main()
     ALINK_LOGI("*         PRODUCT INFO          *");
     ALINK_LOGI("*********************************");
     ALINK_LOGI("name   : %s", product_info.name);
-    ALINK_LOGI("type   : %s", product_info.type);
     ALINK_LOGI("version: %s", product_info.version);
     ALINK_LOGI("model  : %s", product_info.model);
     esp_alink_init(&product_info);

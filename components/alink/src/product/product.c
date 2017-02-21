@@ -82,23 +82,3 @@ char *product_get_sn(char sn_str[PRODUCT_SN_LEN])
 {
     return memcpy(sn_str, g_device_info.sn, PRODUCT_SN_LEN);
 }
-
-char *product_get_type(char type_str[PRODUCT_NAME_LEN])
-{
-    return memcpy(type_str, g_device_info.type, PRODUCT_NAME_LEN);
-}
-
-char *product_get_category(char category_str[PRODUCT_NAME_LEN])
-{
-    return memcpy(category_str, g_device_info.category, PRODUCT_NAME_LEN);
-}
-
-char *product_get_manufacturer(char manufacturer_str[PRODUCT_NAME_LEN])
-{
-    return memcpy(manufacturer_str, g_device_info.manufacturer, PRODUCT_NAME_LEN);
-}
-
-char *product_get_cid(char cid_str[PRODUCT_CID_LEN])
-{
-    return memcpy(cid_str, g_device_info.cid, PRODUCT_CID_LEN);
-}

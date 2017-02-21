@@ -136,7 +136,7 @@ int alink_end(void);
  */
 int alink_factory_reset(void);
 
-/** @} */ //end of entry 
+/** @} */ //end of entry
 
 /** @defgroup wifi_report report status
  *  @{
@@ -175,7 +175,7 @@ int alink_report(const char *method, const char *json_buffer);
  *      until got response from server or timeout.
  */
 int alink_query(const char *method, const char *json_buffer,
-        char *result_buf, int *buf_len);
+                char *result_buf, int *buf_len);
 
 /** @} */ //end of report
 

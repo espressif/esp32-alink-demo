@@ -19,8 +19,11 @@ static const char *TAG = "alink_ssl";
 
 void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_ int server_cert_len)
 {
-    ALINK_PARAM_CHECK(tcp_fd == NULL);
     ALINK_PARAM_CHECK(server_cert == NULL);
+    if (platform_sys_net_is_ready() == ALINK_FALSE) {
+        ALINK_LOGW("wifi disconnect");
+        return NULL;
+    }
 
     SSL *ssl;
     int socket = (int)tcp_fd;
@@ -33,24 +36,33 @@ void *platform_ssl_connect(_IN_ void *tcp_fd, _IN_ const char *server_cert, _IN_
 
 
     ctx = SSL_CTX_new(TLSv1_1_client_method());
-    if(ctx == NULL) platform_mutex_unlock(alink_connect_mutex);
+    if (ctx == NULL) platform_mutex_unlock(alink_connect_mutex);
     ALINK_ERROR_CHECK(ctx == NULL, NULL, "SSL_CTX_new, ret:%p", ctx);
 
     ssl = SSL_new(ctx);
-    if(ssl == NULL) platform_mutex_unlock(alink_connect_mutex);
+    if (ssl == NULL) platform_mutex_unlock(alink_connect_mutex);
     ALINK_ERROR_CHECK(ssl == NULL, NULL, "SSL_new, ret: %p", ssl);
 
     SSL_set_fd(ssl, socket);
     X509 *ca_cert = d2i_X509(NULL, (unsigned char *)server_cert, server_cert_len);
-    if(ca_cert == NULL) platform_mutex_unlock(alink_connect_mutex);
+    if (ca_cert == NULL) {
+        platform_ssl_close(ssl);
+        platform_mutex_unlock(alink_connect_mutex);
+    }
     ALINK_ERROR_CHECK(ca_cert == NULL, NULL, "d2i_X509, ret: %p", ca_cert);
 
     ret = SSL_add_client_CA(ssl, ca_cert);
-    if(ret != pdTRUE) platform_mutex_unlock(alink_connect_mutex);
+    if (ret != pdTRUE) {
+        platform_ssl_close(ssl);
+        platform_mutex_unlock(alink_connect_mutex);
+    }
     ALINK_ERROR_CHECK(ret != pdTRUE, NULL, "SSL_add_client_CA, ret:%d", ret);
 
     ret = SSL_connect(ssl);
-    if(ret != pdTRUE) platform_mutex_unlock(alink_connect_mutex);
+    if (ret != pdTRUE) {
+        platform_ssl_close(ssl);
+        platform_mutex_unlock(alink_connect_mutex);
+    }
     ALINK_ERROR_CHECK(ret != pdTRUE, NULL, "SSL_connect, ret: %d", ret);
     platform_mutex_unlock(alink_connect_mutex);
 
@@ -69,9 +81,10 @@ int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
     if (alink_send_mutex == NULL) alink_send_mutex = platform_mutex_init();
     platform_mutex_lock(alink_send_mutex);
     ret = SSL_write((SSL *)ssl, buffer, length);
+    ALINK_LOGD("SSL_write: ret: %d, length: %d", ret, length);
     platform_mutex_unlock(alink_send_mutex);
 
-    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_write, ret:%d", ret);
+    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_write, ret:%d, errno:%d", ret, errno);
     return ret;
 }
 
@@ -86,7 +99,8 @@ int platform_ssl_recv(_IN_ void *ssl, _OUT_ char *buffer, _IN_ int length)
     ret = SSL_read((SSL*)ssl, buffer, length);
     platform_mutex_unlock(alink_recv_mutex);
 
-    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_read, ret:%d", ret);
+    if (ret <= 0) perror("SSL_read");
+    ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_read, ret:%d, errno:%d", ret, errno);
     return ret;
 }
 

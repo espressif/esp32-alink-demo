@@ -59,16 +59,15 @@ typedef int32_t alink_err_t;
 #define ALINK_LOGV( format, ... ) ESP_LOGV(TAG, format, ##__VA_ARGS__)
 
 #define ALINK_ERROR_CHECK(con, err, format, ...) if(con) {ALINK_LOGE(format, ##__VA_ARGS__); perror(__func__); return err;}
-#define ALINK_PARAM_CHECK(con) if(con) {ALINK_LOGE("Parameter error, "); assert(0);}
+#define ALINK_PARAM_CHECK(con) if(con) {ALINK_LOGE("Parameter error, "); perror(__func__); assert(0);}
 
 /* alink main */
-#define WIFI_WAIT_TIME      (CONFIG_WIFI_WAIT_TIME * 1000 / portTICK_RATE_MS)
+#define WIFI_WAIT_TIME      (CONFIG_WIFI_WAIT_TIME * 1000)
 #define ALINK_RESET_KEY_IO  CONFIG_ALINK_RESET_KEY_IO
 #define DEFAULU_TASK_PRIOTY CONFIG_ALINK_TASK_PRIOTY
 
 /* alink_os */
 #define ALINK_CHIPID "esp32"
-#define SYSTEM_VERSION "esp32_idf"
 #define MODULE_NAME "ESP-WROOM-32"
 
 

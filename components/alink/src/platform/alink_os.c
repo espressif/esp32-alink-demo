@@ -42,6 +42,7 @@ task_infor_t task_infor[] = {
     {"send_worker", NULL},
     {"callback_thread", NULL},
     {"firmware_upgrade_pthread", NULL},
+    {"work queue", NULL},
     {NULL, NULL}
 };
 
@@ -160,6 +161,12 @@ int platform_thread_get_stack_size(_IN_ const char *thread_name)
     } else if (0 == strcmp(thread_name, "callback_thread")) {
         ALINK_LOGD("get callback_thread");
         return 0x800;
+    } else if (0 == strcmp(thread_name, "work queue")) {
+        ALINK_LOGD("get work queue");
+        return 0x800;
+    }  else if (0 == strcmp(thread_name, "wsf_receive_worker")) {
+        ALINK_LOGD("get wsf_receive_worker");
+        return 0x800;
     } else {
         ALINK_LOGE("get othrer thread: %s", thread_name);
         return 0x800;
@@ -242,8 +249,7 @@ int platform_config_read(_OUT_ char *buffer, _IN_ int length)
     nvs_close(config_handle);
 
     if (ret == ESP_ERR_NVS_NOT_FOUND) {
-        ALINK_LOGD("[%s, %d]:nvs_get_blob ret:%x,No data storage,the read data is empty",
-                   __func__, __LINE__ , ret);
+        ALINK_LOGD("nvs_get_blob ret:%x,No data storage,the read data is empty", ret);
         return ALINK_ERR;
     }
     ALINK_ERROR_CHECK(ret != ESP_OK, ALINK_ERR, "nvs_get_blob ret:%x", ret);
@@ -281,7 +287,8 @@ char *platform_get_chipid(_OUT_ char cid_str[PLATFORM_CID_LEN])
 char *platform_get_os_version(_OUT_ char version_str[PLATFORM_OS_VERSION_LEN])
 {
     ALINK_PARAM_CHECK(version_str == NULL);
-    memcpy(version_str, SYSTEM_VERSION, PLATFORM_OS_VERSION_LEN);
+    const char *idf_version = esp_get_idf_version();
+    memcpy(version_str, idf_version, PLATFORM_OS_VERSION_LEN);
     return version_str;
 }
 
@@ -290,11 +297,6 @@ char *platform_get_module_name(_OUT_ char name_str[PLATFORM_MODULE_NAME_LEN])
     ALINK_PARAM_CHECK(name_str == NULL);
     memcpy(name_str, MODULE_NAME, PLATFORM_MODULE_NAME_LEN);
     return name_str;
-}
-
-int platform_sys_net_is_ready(void)
-{
-    return 1;
 }
 
 void platform_sys_reboot(void)

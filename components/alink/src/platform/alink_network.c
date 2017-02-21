@@ -35,7 +35,7 @@ static alink_err_t network_create_socket( pplatform_netaddr_t netaddr, int type,
         struct ip4_addr *ip4_addr = (struct ip4_addr *)hp->h_addr;
         char ipaddr_tmp[64] = {0};
         sprintf(ipaddr_tmp, IPSTR, IP2STR(ip4_addr));
-        ALINK_LOGI("alink server ip: %s\n", ipaddr_tmp);
+        ALINK_LOGI("alink server host: %s, ip: %s\n", netaddr->host, ipaddr_tmp);
         ip = inet_addr(ipaddr_tmp);
     }
 
@@ -235,7 +235,8 @@ void *platform_tcp_client_connect(_IN_ pplatform_netaddr_t netaddr)
     ALINK_ERROR_CHECK(ret != ALINK_OK, NULL, "network_create_socket");
 
     if (-1 == connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in))) {
-        ALINK_LOGE("connect");
+        ALINK_LOGE("connect errno: %d", errno);
+        perror("connect");
         platform_tcp_close((void *)sock);
         return NULL;
     }
@@ -250,6 +251,7 @@ int platform_tcp_send(_IN_ void *handle, _IN_ const char *buffer, _IN_ uint32_t 
     int bytes_sent;
 
     bytes_sent = send((int)handle, buffer, length, 0);
+    ALINK_LOGW()
     ALINK_ERROR_CHECK(bytes_sent <= 0, ALINK_ERR, "send ret:%d", bytes_sent);
     return bytes_sent;
 }
@@ -270,9 +272,7 @@ int platform_tcp_recv(_IN_ void *handle, _OUT_ char *buffer, _IN_ uint32_t lengt
 void platform_tcp_close(_IN_ void *handle)
 {
     close((int)handle);
-    //WSACleanup( );
 }
-
 
 int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
                     void *write_fds[PLATFORM_SOCKET_MAXNUMS],
@@ -295,11 +295,11 @@ int platform_select(void *read_fds[PLATFORM_SOCKET_MAXNUMS],
     pfd_write_set = NULL;
 
     if (NULL != read_fds) {
-        if (((int *)read_fds)[1] == ((int *)read_fds)[2]) {
-            int tmp_fd[PLATFORM_SOCKET_MAXNUMS] = {((int *)read_fds)[0], -1, -1, -1, -1, -1, -1, -1, -1, -1};
-            memcpy((int *)read_fds, tmp_fd, sizeof(tmp_fd));
+        if (((int *)read_fds)[1] == 0 && ((int *)read_fds)[2] == 0) {
             ALINK_LOGD("read_fds: %d %d %d %d",
                        ((int *)read_fds)[0], ((int *)read_fds)[1], ((int *)read_fds)[2], ((int *)read_fds)[3]);
+            int tmp_fd[PLATFORM_SOCKET_MAXNUMS] = {((int *)read_fds)[0], -1, -1, -1, -1, -1, -1, -1, -1, -1};
+            memcpy((int *)read_fds, tmp_fd, sizeof(tmp_fd));
         }
 
         pfd_read_set = malloc(sizeof(fd_set));

@@ -38,7 +38,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_alink.h"
-#ifdef ALINK_PASSTHROUGH
 
 #define DOWN_CMD_QUEUE_NUM  5
 #define UP_CMD_QUEUE_NUM    5
@@ -46,17 +45,6 @@
 #define Method_PostData    "postDeviceData"
 #define Method_PostRawData "postDeviceRawData"
 #define Method_GetAlinkTime "getAlinkTime"
-#define post_data_buffer_size    (512)
-static uint8_t post_data_buffer[post_data_buffer_size];
-static uint8_t raw_data_buffer[post_data_buffer_size];
-
-
-typedef struct alink_raw_data
-{
-    uint8_t *data;
-    int len;
-} alink_raw_data, *alink_raw_data_ptr;
-
 static const char *TAG = "alink_passthrough";
 extern SemaphoreHandle_t xSemWriteInfo;
 static alink_err_t post_data_enable = ALINK_TRUE;
@@ -66,27 +54,6 @@ static xQueueHandle xQueueUpCmd      = NULL;
 static SemaphoreHandle_t xSemWrite   = NULL;
 static SemaphoreHandle_t xSemRead    = NULL;
 static SemaphoreHandle_t xSemDownCmd = NULL;
-
-alink_raw_data_ptr alink_raw_data_malloc(size_t len)
-{
-    ALINK_PARAM_CHECK(len > ALINK_DATA_LEN);
-    alink_raw_data_ptr raw_data = (alink_raw_data_ptr)malloc(sizeof(alink_raw_data));
-    ALINK_ERROR_CHECK(raw_data == NULL, NULL, "malloc ret: %p, free_heap: %d", raw_data, esp_get_free_heap_size());
-    memset(raw_data, 0, sizeof(alink_raw_data));
-    raw_data->data = (uint8_t *)malloc(len);
-    ALINK_ERROR_CHECK(raw_data->data == NULL, NULL, "malloc ret: %p, free_heap: %d", raw_data->data, esp_get_free_heap_size());
-    memset(raw_data->data, 0, len);
-    return raw_data;
-}
-
-alink_err_t alink_raw_data_free(_IN_ alink_raw_data_ptr raw_data)
-{
-    ALINK_PARAM_CHECK(raw_data == NULL);
-    if (raw_data->data) free(raw_data->data);
-    free(raw_data);
-    return ALINK_OK;
-}
-
 
 static char a2x(char ch)
 {
@@ -133,6 +100,7 @@ static char a2x(char ch)
 
     return 0;
 }
+static int count = 0;
 
 int raw_data_unserialize(char *json_buffer, uint8_t *raw_data, int *raw_data_len)
 {
@@ -146,6 +114,11 @@ int raw_data_unserialize(char *json_buffer, uint8_t *raw_data, int *raw_data_len
 
     if (!attr_str || !attr_len || attr_len > *raw_data_len * 2)
         return -1;
+    // ALINK_LOGD("rawData: %s", attr_str);
+    for (i = 0; i < attr_len; i += 2) {
+        raw_data[i / 2] = a2x(attr_str[i]) << 4;
+        raw_data[i / 2] += a2x(attr_str[i + 1]);
+    }
 
     for (i = 0; i < attr_len; i += 2) {
         raw_data[i / 2] = a2x(attr_str[i]) << 4;
@@ -164,28 +137,18 @@ int cloud_get_device_raw_data(char *json_buffer)
     ALINK_PARAM_CHECK(json_buffer == NULL);
     ALINK_LOGI("The cloud initiates a query to the device");
     alink_err_t ret = ALINK_ERR;
-    alink_raw_data_ptr q_data = NULL;
-
-    q_data = alink_raw_data_malloc(ALINK_DATA_LEN);
-    if (q_data == NULL) {
-        ALINK_LOGW("alink_raw_data_malloc is err, free_heap: %d", esp_get_free_heap_size());
-        goto EXIT;
-    }
-
-    ret = raw_data_unserialize(json_buffer, q_data->data, &q_data->len);
-    if (ret != ALINK_OK) {
-        ALINK_LOGW("raw_data_unserialize, ret:%d", ret);
-        goto EXIT;
-    }
+    char *q_data = (char *)malloc(ALINK_DATA_LEN);
+    memcpy(q_data, json_buffer, ALINK_DATA_LEN);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) != pdTRUE) {
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
         ret = ALINK_ERR;
-        goto EXIT;
+        if (q_data) {
+            free(q_data);
+            q_data = NULL;
+        }
     }
 
-EXIT:
-    if (q_data) alink_raw_data_free(q_data);
     platform_mutex_unlock(xSemDownCmd);
     return ret;
 }
@@ -194,99 +157,76 @@ int cloud_set_device_raw_data(char *json_buffer)
 {
     platform_mutex_lock(xSemDownCmd);
     ALINK_PARAM_CHECK(json_buffer == NULL);
+    count++;
     ALINK_LOGI("The cloud is set to send instructions");
     alink_err_t ret = ALINK_ERR;
-    alink_raw_data_ptr q_data = NULL;
-
-    q_data = alink_raw_data_malloc(ALINK_DATA_LEN);
-    if (q_data == NULL) {
-        ALINK_LOGW("alink_raw_data_malloc is err, free_heap: %d", esp_get_free_heap_size());
-        goto EXIT;
-    }
-
-    ret = raw_data_unserialize(json_buffer, q_data->data, &q_data->len);
-    if (ret != ALINK_OK) {
-        ALINK_LOGW("raw_data_unserialize, ret:%d", ret);
-        goto EXIT;
-    }
+    char *q_data = (char *)malloc(ALINK_DATA_LEN);
+    memcpy(q_data, json_buffer, ALINK_DATA_LEN);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) != pdTRUE) {
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
         ret = ALINK_ERR;
-        goto EXIT;
+        if (q_data) {
+            free(q_data);
+            q_data = NULL;
+        }
     }
-
-EXIT:
-    if (q_data) alink_raw_data_free(q_data);
     platform_mutex_unlock(xSemDownCmd);
     return ret;
 }
 
-#define RawDataHeader   "{\"rawData\":\""
-#define RawDataTail     "\", \"length\":\"%d\"}"
 static void alink_post_data(void *arg)
 {
     alink_err_t ret;
-    alink_raw_data_ptr up_cmd = NULL;
-    size_t size;
-    int i = 0;
+    char *up_cmd = NULL;
     for (; post_data_enable;) {
         ret = xQueueReceive(xQueueUpCmd, &up_cmd, portMAX_DELAY);
-        if (ret == pdFALSE) {
+        if (ret != pdTRUE) {
             ALINK_LOGD("There is no data to report");
             continue;
         }
-
-        ALINK_LOGD("alink_device_post_data: param:%p, len: %d", up_cmd->data, up_cmd->len);
-        size = strlen(RawDataHeader);
-        strncpy((char *)raw_data_buffer, RawDataHeader, post_data_buffer_size);
-        for (i = 0; i < up_cmd->len; i++) {
-            size += snprintf((char *)raw_data_buffer + size,
-                             post_data_buffer_size - size, "%02X", up_cmd->data[i]);
-        }
-
-        size += snprintf((char *)raw_data_buffer + size,
-                         post_data_buffer_size - size, RawDataTail, up_cmd->len * 2);
-
-        ret = alink_report(Method_PostRawData, (char *)raw_data_buffer);
-        if (ret == ALINK_ERR) {
+        // ALINK_LOGD("alink_report:%s", up_cmd);
+#ifdef ALINK_PASSTHROUGH
+        ret = alink_report(Method_PostRawData, up_cmd);
+#else
+        ret = alink_report(Method_PostData, up_cmd);
+#endif
+        if (ret != ALINK_OK) {
             ALINK_LOGW("post failed!");
             platform_msleep(2000);
+        } else {
+            ALINK_LOGI("dev post data success!");
         }
-        ALINK_LOGI("dev post data success!");
-        if (up_cmd) alink_raw_data_free(up_cmd);
+        if (up_cmd) {
+            free(up_cmd);
+            up_cmd = NULL;
+        }
     }
     vTaskDelete(NULL);
 }
 
-#if 0
-static int alink_handler_systemstates_callback(_IN_ void *dev_mac, _IN_ void *sys_state)
+void cloud_connected(void)
 {
-    ALINK_PARAM_CHECK(dev_mac == NULL);
-    ALINK_PARAM_CHECK(sys_state == NULL);
-
-    enum ALINK_STATUS *state = (enum ALINK_STATUS *)sys_state;
-    switch (*state) {
-    case ALINK_STATUS_INITED:
-        ALINK_LOGI("ALINK_STATUS_INITED, mac %s uuid %s", (char *)dev_mac, alink_get_uuid(NULL));
-        break;
-    case ALINK_STATUS_REGISTERED:
-        ALINK_LOGI("ALINK_STATUS_REGISTERED, mac %s uuid %s", (char *)dev_mac, alink_get_uuid(NULL));
-        break;
-    case ALINK_STATUS_LOGGED:
-        ALINK_LOGI("ALINK_STATUS_LOGGED, mac %s uuid %s", (char *)dev_mac, alink_get_uuid(NULL));
-        vTaskDelay(100 / portTICK_RATE_MS);
-        if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
-        xSemaphoreGive(xSemWriteInfo);
-        break;
-    default:
-        break;
-    }
-    return ALINK_OK;
+    ALINK_LOGI("alink cloud connected!");
+    vTaskDelay(100 / portTICK_RATE_MS);
+    if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
+    xSemaphoreGive(xSemWriteInfo);
 }
-#endif
-void cloud_connected(void) { printf("alink cloud connected!\n"); }
-void cloud_disconnected(void) { printf("alink cloud disconnected!\n"); }
+
+void cloud_disconnected(void)
+{
+    ALINK_LOGI("alink cloud disconnected!");
+}
+
+static void free_heap_task(void *arg)
+{
+    while (1) {
+        ALINK_LOGD("free heap size: %d", esp_get_free_heap_size());
+        ALINK_LOGD("Receive the cloud: %d", count);
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
+    vTaskDelete(NULL);
+}
 
 void alink_trans_init()
 {
@@ -296,21 +236,27 @@ void alink_trans_init()
     xSemDownCmd      = platform_mutex_init();
     xQueueUpCmd      = xQueueCreate(DOWN_CMD_QUEUE_NUM, sizeof(char *));
     xQueueDownCmd    = xQueueCreate(UP_CMD_QUEUE_NUM, sizeof(char *));
-    alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN | ALINK_LL_ERROR);
-    // alink_set_loglevel(ALINK_LL_ERROR | ALINK_LL_WARN);
+    // alink_set_loglevel(ALINK_LL_DEBUG | ALINK_LL_INFO | ALINK_LL_WARN | ALINK_LL_ERROR);
+    alink_set_loglevel(ALINK_LL_DEBUG);
 
-    alink_enable_daily_mode(NULL, 0);
+    // alink_enable_daily_mode(NULL, 0);
     alink_register_callback(ALINK_CLOUD_CONNECTED, &cloud_connected);
     alink_register_callback(ALINK_CLOUD_DISCONNECTED, &cloud_disconnected);
+
+#ifdef ALINK_PASSTHROUGH
     alink_register_callback(ALINK_GET_DEVICE_RAWDATA, &cloud_get_device_raw_data);
     alink_register_callback(ALINK_SET_DEVICE_RAWDATA, &cloud_set_device_raw_data);
+#else
+    alink_register_callback(ALINK_GET_DEVICE_STATUS, &cloud_get_device_raw_data);
+    alink_register_callback(ALINK_SET_DEVICE_STATUS, &cloud_set_device_raw_data);
+#endif
     alink_start();
     ALINK_LOGI("wait main device login");
     /*wait main device login, -1 means wait forever */
     alink_wait_connect(ALINK_WAIT_FOREVER);
     xTaskCreate(alink_post_data, "alink_post_data", 1024 * 4, NULL, DEFAULU_TASK_PRIOTY, NULL);
+    xTaskCreate(free_heap_task, "free_heap_task", 1024 * 8, NULL, 3, NULL);
 }
-
 
 void alink_trans_destroy()
 {
@@ -319,32 +265,48 @@ void alink_trans_destroy()
     platform_mutex_destroy(xSemWrite);
     platform_mutex_destroy(xSemRead);
     platform_mutex_destroy(xSemDownCmd);
+    platform_mutex_destroy(xSemWriteInfo);
     vQueueDelete(xQueueUpCmd);
     vQueueDelete(xQueueDownCmd);
 }
 
-
-int esp_write(_IN_ void *up_cmd, size_t size, TickType_t ticks_to_wait)
+#ifdef ALINK_PASSTHROUGH
+#define RawDataHeader   "{\"rawData\":\""
+#define RawDataTail     "\", \"length\":\"%d\"}"
+static uint8_t raw_data_buffer[ALINK_DATA_LEN];
+int esp_write(_IN_ void *up_cmd, size_t len, TickType_t ticks_to_wait)
 {
     platform_mutex_lock(xSemWrite);
     ALINK_PARAM_CHECK(up_cmd == NULL);
-    ALINK_PARAM_CHECK(size == 0 || size > ALINK_DATA_LEN);
+    ALINK_PARAM_CHECK(len == 0 || len > ALINK_DATA_LEN);
 
-    alink_err_t ret = ALINK_ERR;
-    alink_raw_data_ptr q_data = alink_raw_data_malloc(ALINK_DATA_LEN);
-    q_data->len = ALINK_DATA_LEN;
-    if (size < q_data->len) q_data->len = size;
+    alink_err_t ret = ALINK_OK;
+    int i = 0;
+    char *q_data = (char *)malloc(ALINK_DATA_LEN);
 
-    memcpy(q_data->data, up_cmd, q_data->len);
+    int size = strlen(RawDataHeader);
+    strncpy((char *)raw_data_buffer, RawDataHeader, ALINK_DATA_LEN);
+    for (i = 0; i < len; i++) {
+        size += snprintf((char *)raw_data_buffer + size,
+                         ALINK_DATA_LEN - size, "%02X", ((uint8_t *)up_cmd)[i]);
+    }
+
+    size += snprintf((char *)raw_data_buffer + size,
+                     ALINK_DATA_LEN - size, RawDataTail, len * 2);
+
+    memcpy(q_data, raw_data_buffer, ALINK_DATA_LEN);
     ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
         ALINK_LOGW("xQueueSend xQueueUpCmd, wait_time: %d", ticks_to_wait);
-        alink_raw_data_free(q_data);
-        platform_mutex_unlock(xSemWrite);
-        return ALINK_ERR;
+        if (q_data) {
+            free(q_data);
+            q_data = NULL;
+        }
+    } else {
+        ret = size;
     }
     platform_mutex_unlock(xSemWrite);
-    return ALINK_OK;
+    return ret;
 }
 
 int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait)
@@ -355,17 +317,76 @@ int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait)
 
     alink_err_t ret = ALINK_ERR;
 
-    alink_raw_data_ptr q_data = NULL;
+    char *q_data = NULL;
     ret = xQueueReceive(xQueueDownCmd, &q_data, ticks_to_wait);
     if (ret == pdFALSE) {
         ALINK_LOGE("xQueueReceive xQueueDownCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
-        platform_mutex_unlock(xSemRead);
-        return ALINK_ERR;
+        ret = ALINK_ERR;
+        goto EXIT;
     }
 
-    if (q_data->len < size) size = q_data->len;
-    memcpy(down_cmd, q_data->data, size);
-    alink_raw_data_free(q_data);
+    ret = raw_data_unserialize(q_data, (uint8_t *)down_cmd, (int *)&size);
+    if (ret != ALINK_OK) {
+        ALINK_LOGW("raw_data_unserialize, ret:%d", ret);
+        size = ret;
+    }
+    if (q_data) {
+        free(q_data);
+        q_data = NULL;
+    }
+EXIT:
+    platform_mutex_unlock(xSemRead);
+    return size;
+}
+
+#else
+
+int esp_write(_IN_ void *up_cmd, size_t len, TickType_t ticks_to_wait)
+{
+    platform_mutex_lock(xSemWrite);
+    ALINK_PARAM_CHECK(up_cmd == NULL);
+    ALINK_PARAM_CHECK(len == 0 || len > ALINK_DATA_LEN);
+
+    alink_err_t ret = ALINK_OK;
+    char *q_data = (char *)malloc(ALINK_DATA_LEN);
+    memcpy(q_data, up_cmd, len);
+    ret = xQueueSend(xQueueUpCmd, &q_data, ticks_to_wait);
+    if (ret == pdFALSE) {
+        ALINK_LOGW("xQueueSend xQueueUpCmd, wait_time: %d", ticks_to_wait);
+        if (q_data) {
+            free(q_data);
+            q_data = NULL;
+        }
+    } else {
+        ret = len;
+    }
+    platform_mutex_unlock(xSemWrite);
+    return ret;
+}
+
+int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait)
+{
+    platform_mutex_lock(xSemRead);
+    ALINK_PARAM_CHECK(down_cmd == NULL);
+    ALINK_PARAM_CHECK(size == 0 || size > ALINK_DATA_LEN);
+    alink_err_t ret = ALINK_ERR;
+
+    char *q_data = NULL;
+    ret = xQueueReceive(xQueueDownCmd, &q_data, ticks_to_wait);
+    if (ret == pdFALSE) {
+        ALINK_LOGE("xQueueReceive xQueueDownCmd, ret:%d, wait_time: %d", ret, ticks_to_wait);
+        ret = ALINK_ERR;
+        goto EXIT;
+    }
+
+    size = strlen(q_data) + 1;
+    memcpy(down_cmd, q_data, size);
+
+    if (q_data) {
+        free(q_data);
+        q_data = NULL;
+    }
+EXIT:
     platform_mutex_unlock(xSemRead);
     return size;
 }

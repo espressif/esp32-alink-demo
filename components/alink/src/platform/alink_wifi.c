@@ -51,13 +51,11 @@ static void IRAM_ATTR  wifi_sniffer_cb_(void *recv_buf, wifi_promiscuous_pkt_typ
 //若是rtos的平台，注册收包回调函数aws_80211_frame_handler()到系统接口
 void platform_awss_open_monitor(_IN_ platform_awss_recv_80211_frame_cb_t cb)
 {
-    // wifi_promiscuous_filter_t filter = {2, 0, 0, 0};
     g_sniffer_cb = cb;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_channel(6, 0));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(0));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_cb_));
-    // ESP_ERROR_CHECK(esp_wifi_set_promiscuous_filter(&filter));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(1));
 }
 
@@ -97,4 +95,67 @@ uint32_t platform_wifi_get_ip(_OUT_ char ip_str[PLATFORM_IP_LEN])
     memcpy(ip_str, inet_ntoa(infor.ip.addr), PLATFORM_IP_LEN);
     return infor.ip.addr;
 }
+
+static alink_err_t sys_net_is_ready = ALINK_FALSE;
+int platform_sys_net_is_ready(void)
+{
+    return sys_net_is_ready;
+}
+
+static SemaphoreHandle_t xSemConnet = NULL;
+static alink_err_t event_handler(void *ctx, system_event_t *event)
+{
+    switch (event->event_id) {
+    case SYSTEM_EVENT_STA_START:
+        ALINK_LOGI("SYSTEM_EVENT_STA_START");
+        ESP_ERROR_CHECK( esp_wifi_connect() );
+        break;
+    case SYSTEM_EVENT_STA_GOT_IP:
+        sys_net_is_ready = ALINK_TRUE;
+        ALINK_LOGI("SYSTEM_EVENT_STA_GOT_IP");
+        xSemaphoreGive(xSemConnet);
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        ALINK_LOGI("SYSTEM_EVENT_STA_DISCONNECTED");
+        sys_net_is_ready = ALINK_FALSE;
+        ESP_ERROR_CHECK( esp_wifi_connect() );
+        break;
+    default:
+        break;
+    }
+    return ALINK_OK;
+}
+
+alink_err_t alink_write_wifi_config(_IN_ const wifi_config_t *wifi_config);
+int platform_awss_connect_ap(
+    _IN_ uint32_t connection_timeout_ms,
+    _IN_ char ssid[PLATFORM_MAX_SSID_LEN],
+    _IN_ char passwd[PLATFORM_MAX_PASSWD_LEN],
+    _IN_OPT_ enum AWSS_AUTH_TYPE auth,
+    _IN_OPT_ enum AWSS_ENC_TYPE encry,
+    _IN_OPT_ uint8_t bssid[ETH_ALEN],
+    _IN_OPT_ uint8_t channel)
+{
+    wifi_config_t wifi_config;
+    if (xSemConnet == NULL) {
+        xSemConnet = xSemaphoreCreateBinary();
+        esp_event_loop_set_cb(event_handler, NULL);
+    }
+
+    ESP_ERROR_CHECK( esp_wifi_get_config(WIFI_IF_STA, &wifi_config) );
+    memcpy(wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+    memcpy(wifi_config.sta.password, passwd, sizeof(wifi_config.sta.password));
+    ALINK_LOGI("ap ssid: %s, password: %s", wifi_config.sta.ssid, wifi_config.sta.password);
+
+    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    ESP_ERROR_CHECK( esp_wifi_start() );
+
+    BaseType_t err = xSemaphoreTake(xSemConnet, connection_timeout_ms / portTICK_RATE_MS);
+    if (err != pdTRUE) ESP_ERROR_CHECK( esp_wifi_stop() );
+    ALINK_ERROR_CHECK(err != pdTRUE, ALINK_ERR, "xSemaphoreTake ret:%x wait: %d", err, connection_timeout_ms);
+    alink_write_wifi_config(&wifi_config);
+    return ALINK_OK;
+}
+
 
