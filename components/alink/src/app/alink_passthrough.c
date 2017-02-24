@@ -137,8 +137,10 @@ int cloud_get_device_raw_data(char *json_buffer)
     ALINK_PARAM_CHECK(json_buffer == NULL);
     ALINK_LOGI("The cloud initiates a query to the device");
     alink_err_t ret = ALINK_ERR;
-    char *q_data = (char *)malloc(ALINK_DATA_LEN);
-    memcpy(q_data, json_buffer, ALINK_DATA_LEN);
+    int size = strlen(json_buffer) + 1;
+    char *q_data = (char *)malloc(size);
+    if (size > ALINK_DATA_LEN) ALINK_LOGW("json_buffer len:%d", size);
+    memcpy(q_data, json_buffer, size);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) != pdTRUE) {
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
@@ -160,8 +162,10 @@ int cloud_set_device_raw_data(char *json_buffer)
     count++;
     ALINK_LOGI("The cloud is set to send instructions");
     alink_err_t ret = ALINK_ERR;
-    char *q_data = (char *)malloc(ALINK_DATA_LEN);
-    memcpy(q_data, json_buffer, ALINK_DATA_LEN);
+    int size = strlen(json_buffer) + 1;
+    char *q_data = (char *)malloc(size);
+    if (size > ALINK_DATA_LEN) ALINK_LOGW("json_buffer len:%d", size);
+    memcpy(q_data, json_buffer, size);
 
     if (xQueueSend(xQueueDownCmd, &q_data, 0) != pdTRUE) {
         ALINK_LOGW("xQueueSend xQueueDownCmd is err");
@@ -221,9 +225,9 @@ void cloud_disconnected(void)
 static void free_heap_task(void *arg)
 {
     while (1) {
-        ALINK_LOGD("free heap size: %d", esp_get_free_heap_size());
-        ALINK_LOGD("Receive the cloud: %d", count);
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        ALINK_LOGD("free heap size: %d, The number of packets received: %d",
+                   esp_get_free_heap_size(), count);
+        vTaskDelay(2000 / portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
 }
@@ -324,19 +328,24 @@ int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait)
         ret = ALINK_ERR;
         goto EXIT;
     }
+    if (strlen(q_data) + 1 > ALINK_DATA_LEN) {
+        ALINK_LOGW("read len > ALINK_DATA_LEN, len: %d", strlen(q_data) + 1);
+        ret = ALINK_DATA_LEN;
+        goto EXIT;
+    }
 
     ret = raw_data_unserialize(q_data, (uint8_t *)down_cmd, (int *)&size);
     if (ret != ALINK_OK) {
         ALINK_LOGW("raw_data_unserialize, ret:%d", ret);
-        size = ret;
     }
     if (q_data) {
         free(q_data);
         q_data = NULL;
     }
+    ret = size;
 EXIT:
     platform_mutex_unlock(xSemRead);
-    return size;
+    return ret;
 }
 
 #else

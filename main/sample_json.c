@@ -135,19 +135,7 @@ void app_main()
         .secret         = "YJJZjytOCXDhtQqip4EjWbhR95zTgI92RVjzjyZF",
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-        // .type           = "LIGHT",
-        // .category       = "LIVING",
-        // .manufacturer   = "ALINKTEST",
-        // .cid            = "2D0044000F47333139373038",
     };
-
-    ALINK_LOGI("*********************************");
-    ALINK_LOGI("*         PRODUCT INFO          *");
-    ALINK_LOGI("*********************************");
-    ALINK_LOGI("name   : %s", product_info.name);
-    ALINK_LOGI("type   : %s", product_info.type);
-    ALINK_LOGI("version: %s", product_info.version);
-    ALINK_LOGI("model  : %s", product_info.model);
     esp_alink_init(&product_info);
 
     if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();

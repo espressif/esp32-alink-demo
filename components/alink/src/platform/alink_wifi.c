@@ -53,10 +53,10 @@ void platform_awss_open_monitor(_IN_ platform_awss_recv_80211_frame_cb_t cb)
 {
     g_sniffer_cb = cb;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_channel(6, 0));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(0));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_sniffer_cb_));
     ESP_ERROR_CHECK(esp_wifi_set_promiscuous(1));
+    ESP_ERROR_CHECK(esp_wifi_set_channel(6, 0));
 }
 
 //退出monitor模式，回到station模式, 其他资源回收

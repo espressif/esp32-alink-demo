@@ -87,7 +87,7 @@ void write_task_test(void *arg)
                    light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
         ret = esp_write(&light_info, sizeof(dev_info_t), 500 / portTICK_PERIOD_MS);
         if (ret == ALINK_ERR) ALINK_LOGW("esp_write is err");
-        vTaskDelay(500/portTICK_RATE_MS);
+        vTaskDelay(500 / portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
 }
@@ -117,19 +117,7 @@ void app_main()
         .secret         = "W6tXrtzgQHGZqksvJLMdCPArmkecBAdcr2F5tjuF",
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-        // .type           = "LIGHT",
-        // .category       = "LIVING",
-        // .manufacturer   = "ALINKTEST",
-        // .cid            = "2D0044000F47333139373038",
     };
-
-
-    ALINK_LOGI("*********************************");
-    ALINK_LOGI("*         PRODUCT INFO          *");
-    ALINK_LOGI("*********************************");
-    ALINK_LOGI("name   : %s", product_info.name);
-    ALINK_LOGI("version: %s", product_info.version);
-    ALINK_LOGI("model  : %s", product_info.model);
     esp_alink_init(&product_info);
 
     if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();

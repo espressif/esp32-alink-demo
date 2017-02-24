@@ -81,7 +81,7 @@ int platform_ssl_send(_IN_ void *ssl, _IN_ const char *buffer, _IN_ int length)
     if (alink_send_mutex == NULL) alink_send_mutex = platform_mutex_init();
     platform_mutex_lock(alink_send_mutex);
     ret = SSL_write((SSL *)ssl, buffer, length);
-    ALINK_LOGD("SSL_write: ret: %d, length: %d", ret, length);
+    // ALINK_LOGD("SSL_write: ret: %d, length: %d", ret, length);
     platform_mutex_unlock(alink_send_mutex);
 
     ALINK_ERROR_CHECK(ret <= 0, ALINK_ERR, "SSL_write, ret:%d, errno:%d", ret, errno);
