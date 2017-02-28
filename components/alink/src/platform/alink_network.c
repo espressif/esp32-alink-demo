@@ -167,7 +167,6 @@ int platform_udp_recvfrom(
 {
     ALINK_PARAM_CHECK((int)handle < 0);
     ALINK_PARAM_CHECK(buffer == NULL);
-    // ALINK_PARAM_CHECK(netaddr == NULL);
     int ret_code;
     struct sockaddr_in addr;
     unsigned int addr_len = sizeof(addr);

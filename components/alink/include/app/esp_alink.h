@@ -72,10 +72,17 @@ typedef int32_t alink_err_t;
 
 
 #define ALINK_DATA_LEN 512
-/* alink_main */
-int esp_write(_IN_ void *up_cmd, size_t size, TickType_t ticks_to_wait);
-int esp_read(_OUT_ void *down_cmd, size_t size, TickType_t ticks_to_wait);
-
-void esp_alink_init(_IN_ const void *product_info);
+typedef enum {
+    ALINK_EVENT_CLOUD_CONNECTED = 0,
+    ALINK_EVENT_CLOUD_DISCONNECTED,
+    ALINK_EVENT_GET_DEVICE_DATA,
+    ALINK_EVENT_SET_DEVICE_DATA,
+    ALINK_EVENT_POST_CLOUD_DATA,
+} alink_event_t;
+typedef alink_err_t (*alink_event_cb_t)(alink_event_t event);
+int esp_alink_event_init(_IN_ alink_event_cb_t cb);
+int esp_alink_init(_IN_ const void *product_info);
+int esp_alink_write(_IN_ void *up_cmd, size_t size, int micro_seconds);
+int esp_alink_read(_OUT_ void *down_cmd, size_t size, int  micro_seconds);
 
 #endif

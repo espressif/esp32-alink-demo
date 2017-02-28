@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 export IDF_PATH=$(pwd)/esp-idf
 echo "----------------------"
 echo "PLease Check IDF_PATH:" $IDF_PATH
