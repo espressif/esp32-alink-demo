@@ -1,3 +1,9 @@
 [submodule "esp-idf"]
 	path = esp-idf
 	url = https://github.com/espressif/esp-idf.git
+[submodule "components/esp-alink-v2.0"]
+	path = components/esp-alink-v2.0
+	url = https://gitlab.espressif.cn:6688/cloud/esp-alink-v2.0.git
+[submodule "components/esp-alink-v1.1"]
+	path = components/esp-alink-v1.1
+	url = https://gitlab.espressif.cn:6688/cloud/esp-alink-v1.1.git

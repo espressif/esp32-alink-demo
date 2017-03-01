@@ -66,7 +66,7 @@ void read_task_test(void *arg)
 
         if (ret == sizeof(dev_info_t) && (down_cmd.header == LIGHT_METADATA_HEADER) && (down_cmd.end == LIGHT_METADATA_END)) {
             memcpy(&light_info, &down_cmd, sizeof(dev_info_t));
-            ALINK_LOGD("read: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
+            ALINK_LOGI("read: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
                        light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
         }
         xSemaphoreGive(xSemWriteInfo);
@@ -82,7 +82,7 @@ void write_task_test(void *arg)
             ALINK_LOGE("xSemaphoreTake:xQueueDevInfo is empty");
             break;
         }
-        ALINK_LOGD("write: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
+        ALINK_LOGI("write: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
                    light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
         ret = esp_alink_write(&light_info, sizeof(dev_info_t), 500);
         if (ret == ALINK_ERR) ALINK_LOGW("esp_alink_write is err");
@@ -144,6 +144,7 @@ void app_main()
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
 
     if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
+
     alink_product_t product_info = {
         .sn             = "12345678",
         .name           = "ALINKTEST",
@@ -153,7 +154,13 @@ void app_main()
         .secret         = "W6tXrtzgQHGZqksvJLMdCPArmkecBAdcr2F5tjuF",
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
+        /*You do not need to set the following parameters in alink v2.0 */
+        .type           = "LIGHT",
+        .category       = "LIVING",
+        .manufacturer   = "ALINKTEST",
+        .cid            = "2D0044000F47333139373038",
     };
+
     ESP_ERROR_CHECK( esp_alink_event_init(alink_event_handler) );
     ESP_ERROR_CHECK( esp_alink_init(&product_info) );
     xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
