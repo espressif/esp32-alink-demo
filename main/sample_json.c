@@ -26,32 +26,37 @@
 #include "cJSON.h"
 
 #ifndef ALINK_PASSTHROUGH
-static const char *TAG = "app_main";
+static const char *TAG = "sample_json";
 SemaphoreHandle_t xSemWriteInfo = NULL;
 
 /*do your job here*/
 typedef struct  virtual_dev {
+    char errorcode;
+    char hue;
+    char luminance;
     char power;
-    char temp_value;
-    char light_value;
-    char time_delay;
     char work_mode;
 } dev_info_t;
 
 static dev_info_t light_info = {
-    .power       = 0x01,
-    .work_mode   = 0x30,
-    .temp_value  = 0x50,
-    .light_value = 0,
-    .time_delay  = 0x01,
+    .errorcode = 0x00,
+    .hue       = 0x10,
+    .luminance = 0x50,
+    .power     = 0x01,
+    .work_mode = 0x02,
 };
 
-static char *device_attr[5] = { "OnOff_Power", "Color_Temperature", "Light_Brightness",
-                                "TimeDelay_PowerOff", "WorkMode_MasterLight"
-                              };
+const char *device_attr[] = {
+    "ErrorCode",
+    "Hue",
+    "Luminance",
+    "Switch",
+    "WorkMode",
+    NULL
+};
 
 const char *main_dev_params =
-    "{\"OnOff_Power\": { \"value\": \"%d\" }, \"Color_Temperature\": { \"value\": \"%d\" }, \"Light_Brightness\": { \"value\": \"%d\" }, \"TimeDelay_PowerOff\": { \"value\": \"%d\"}, \"WorkMode_MasterLight\": { \"value\": \"%d\"}}";
+    "{\"ErrorCode\":{\"value\":\"%d\"},\"Hue\":{\"value\":\"%d\"},\"Luminance\":{\"value\":\"%d\"},\"Switch\":{\"value\":\"%d\"},\"WorkMode\":{\"value\":\"%d\"}}";
 
 void read_task_test(void *arg)
 {
@@ -77,16 +82,16 @@ void read_task_test(void *arg)
                 *(valueStr + valueLen) = lastChar;
                 switch (i) {
                 case 0:
-                    light_info.power = value;
+                    light_info.errorcode = value;
                     break;
                 case 1:
-                    light_info.temp_value = value;
+                    light_info.hue = value;
                     break;
                 case 2:
-                    light_info.light_value = value;
+                    light_info.luminance = value;
                     break;
                 case 3:
-                    light_info.time_delay = value;
+                    light_info.power = value;
                     break;
                 case 4:
                     light_info.work_mode = value;
@@ -96,8 +101,8 @@ void read_task_test(void *arg)
                 }
             }
         }
-        ALINK_LOGD("read: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
-                   light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
+        ALINK_LOGI("read: errorcode:%d, hue: %d, luminance: %d, Switch: %d, work_mode: %d",
+                   light_info.errorcode, light_info.hue, light_info.luminance, light_info.power, light_info.work_mode);
         xSemaphoreGive(xSemWriteInfo);
     }
     free(down_cmd);
@@ -111,9 +116,9 @@ void write_task_test(void *arg)
     for (;;) {
         xSemaphoreTake(xSemWriteInfo, portMAX_DELAY);
         memset(up_cmd, 0, ALINK_DATA_LEN);
-        sprintf(up_cmd, main_dev_params, light_info.power,
-                light_info.temp_value, light_info.light_value,
-                light_info.time_delay, light_info.work_mode);
+        sprintf(up_cmd, main_dev_params, light_info.errorcode,
+                light_info.hue, light_info.luminance,
+                light_info.power, light_info.work_mode);
         ret = esp_alink_write(up_cmd, ALINK_DATA_LEN, 500 / portTICK_PERIOD_MS);
         if (ret == ALINK_ERR) ALINK_LOGW("esp_alink_write is err");
         platform_msleep(500);
@@ -122,6 +127,7 @@ void write_task_test(void *arg)
     vTaskDelete(NULL);
 }
 
+int count = 0;
 alink_err_t alink_event_handler(alink_event_t event)
 {
     switch (event) {
@@ -129,15 +135,17 @@ alink_err_t alink_event_handler(alink_event_t event)
         ALINK_LOGD("alink cloud connected!");
         if (xSemWriteInfo == NULL)
             xSemWriteInfo = xSemaphoreCreateBinary();
-        xSemaphoreGive(xSemWriteInfo);
+            // xSemaphoreGive(xSemWriteInfo);
         break;
     case ALINK_EVENT_CLOUD_DISCONNECTED:
         ALINK_LOGD("alink cloud disconnected!");
         break;
     case ALINK_EVENT_GET_DEVICE_DATA:
+        count++;
         ALINK_LOGD("The cloud initiates a query to the device");
         break;
     case ALINK_EVENT_SET_DEVICE_DATA:
+        count++;
         ALINK_LOGD("The cloud is set to send instructions");
         break;
     case ALINK_EVENT_POST_CLOUD_DATA:
@@ -152,7 +160,7 @@ alink_err_t alink_event_handler(alink_event_t event)
 static void free_heap_task(void *arg)
 {
     for (;;) {
-        ALINK_LOGD("free heap size: %d", esp_get_free_heap_size());
+        ALINK_LOGI("free heap size: %d, count: %d", esp_get_free_heap_size(), count);
         vTaskDelay(5000 / portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
@@ -164,6 +172,10 @@ static void free_heap_task(void *arg)
  * Parameters   : none
  * Returns      : none
 *******************************************************************************/
+
+#include "string.h"
+#include "stdlib.h"
+#include "stdio.h"
 void app_main()
 {
     ALINK_LOGI("free_heap :%u\n", esp_get_free_heap_size());
@@ -176,25 +188,20 @@ void app_main()
 
     if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
     alink_product_t product_info = {
-        .sn             = "12345678",
-        .name           = "ALINKTEST",
+        .name           = "alink_product",
         .version        = "1.0.0",
-        .model          = "ALINKTEST_LIVING_LIGHT_SMARTLED",
-        .key            = "ljB6vqoLzmP8fGkE6pon",
-        .secret         = "YJJZjytOCXDhtQqip4EjWbhR95zTgI92RVjzjyZF",
+        .model          = "ALINKTEST_LIVING_LIGHT_ALINK_TEST",
+        .key            = "5gPFl8G4GyFZ1fPWk20m",
+        .secret         = "ngthgTlZ65bX5LpViKIWNsDPhOf2As9ChnoL9gQb",
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-        /*You do not need to set the following parameters in alink v2.0 */
-        .type           = "LIGHT",
-        .category       = "LIVING",
-        .manufacturer   = "ALINKTEST",
-        .cid            = "2D0044000F47333139373038",
     };
+
 
     ESP_ERROR_CHECK( esp_alink_event_init(alink_event_handler) );
     ESP_ERROR_CHECK( esp_alink_init(&product_info) );
-    xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
-    xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 4, NULL);
-    xTaskCreate(free_heap_task, "free_heap_task", 1024 * 8, NULL, 3, NULL);
+    xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
+    xTaskCreate(write_task_test, "write_task_test", 1024 * 2, NULL, 4, NULL);
+    xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
 }
 #endif

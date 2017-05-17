@@ -146,7 +146,6 @@ void app_main()
     if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
 
     alink_product_t product_info = {
-        .sn             = "12345678",
         .name           = "ALINKTEST",
         .version        = "1.0.0",
         .model          = "ALINKTEST_LIVING_LIGHT_SMARTLED_LUA",
@@ -154,18 +153,13 @@ void app_main()
         .secret         = "W6tXrtzgQHGZqksvJLMdCPArmkecBAdcr2F5tjuF",
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-        /*You do not need to set the following parameters in alink v2.0 */
-        .type           = "LIGHT",
-        .category       = "LIVING",
-        .manufacturer   = "ALINKTEST",
-        .cid            = "2D0044000F47333139373038",
     };
 
     ESP_ERROR_CHECK( esp_alink_event_init(alink_event_handler) );
     ESP_ERROR_CHECK( esp_alink_init(&product_info) );
-    xTaskCreate(read_task_test, "read_task_test", 1024 * 8, NULL, 9, NULL);
-    xTaskCreate(write_task_test, "write_task_test", 1024 * 8, NULL, 4, NULL);
-    xTaskCreate(free_heap_task, "free_heap_task", 1024 * 8, NULL, 3, NULL);
+    xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
+    xTaskCreate(write_task_test, "write_task_test", 1024 * 2, NULL, 4, NULL);
+    xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
 }
 
 #endif
