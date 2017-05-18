@@ -132,16 +132,15 @@ alink_err_t alink_event_handler(alink_event_t event)
 {
     switch (event) {
     case ALINK_EVENT_CLOUD_CONNECTED:
-        ALINK_LOGD("alink cloud connected!");
+        ALINK_LOGD("Alink cloud connected!");
         if (xSemWriteInfo == NULL)
             xSemWriteInfo = xSemaphoreCreateBinary();
-            // xSemaphoreGive(xSemWriteInfo);
+        // xSemaphoreGive(xSemWriteInfo);
         break;
     case ALINK_EVENT_CLOUD_DISCONNECTED:
-        ALINK_LOGD("alink cloud disconnected!");
+        ALINK_LOGD("Alink cloud disconnected!");
         break;
     case ALINK_EVENT_GET_DEVICE_DATA:
-        count++;
         ALINK_LOGD("The cloud initiates a query to the device");
         break;
     case ALINK_EVENT_SET_DEVICE_DATA:
@@ -149,8 +148,28 @@ alink_err_t alink_event_handler(alink_event_t event)
         ALINK_LOGD("The cloud is set to send instructions");
         break;
     case ALINK_EVENT_POST_CLOUD_DATA:
-        ALINK_LOGD("the device post data success!");
+        ALINK_LOGD("The device post data success!");
         break;
+    case ALINK_EVENT_STA_DISCONNECTED:
+        ALINK_LOGD("Wifi disconnected");
+        break;
+    case ALINK_EVENT_CONFIG_NETWORK:
+        ALINK_LOGD("Enter the network configuration mode");
+        break;
+    case ALINK_EVENT_UPDATE_ROUTER:
+        ALINK_LOGD("Requests update router");
+        alink_update_router();
+        break;
+    case ALINK_EVENT_FACTORY_RESET:
+        ALINK_LOGD("Requests factory reset");
+        esp_alink_factory_reset();
+        break;
+    case ALINK_EVENT_ACTIVATE_DEVICE:
+        ALINK_LOGD("Requests activate device");
+        alink_activate_device();
+        xSemaphoreGive(xSemWriteInfo);
+        break;
+
     default:
         break;
     }
@@ -173,9 +192,7 @@ static void free_heap_task(void *arg)
  * Returns      : none
 *******************************************************************************/
 
-#include "string.h"
-#include "stdlib.h"
-#include "stdio.h"
+void alink_key_event(void* arg);
 void app_main()
 {
     ALINK_LOGI("free_heap :%u\n", esp_get_free_heap_size());
@@ -185,6 +202,7 @@ void app_main()
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+
 
     if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
     alink_product_t product_info = {
@@ -197,9 +215,10 @@ void app_main()
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
     };
 
-
     ESP_ERROR_CHECK( esp_alink_event_init(alink_event_handler) );
+    xTaskCreate(alink_key_event, "alink_key_event", 1024 * 4, NULL, 10, NULL);
     ESP_ERROR_CHECK( esp_alink_init(&product_info) );
+
     xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 2, NULL, 4, NULL);
     xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
