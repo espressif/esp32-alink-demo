@@ -24,106 +24,120 @@
 #include "esp_alink.h"
 #include "product.h"
 #include "cJSON.h"
+#include "alink_json_parser.h"
 
 #ifndef ALINK_PASSTHROUGH
 static const char *TAG = "sample_json";
-SemaphoreHandle_t xSemWriteInfo = NULL;
 
 /*do your job here*/
 typedef struct  virtual_dev {
-    char errorcode;
-    char hue;
-    char luminance;
-    char power;
-    char work_mode;
+    uint8_t errorcode;
+    uint8_t hue;
+    uint8_t luminance;
+    uint8_t power;
+    uint8_t work_mode;
 } dev_info_t;
 
-static dev_info_t light_info = {
-    .errorcode = 0x00,
-    .hue       = 0x10,
-    .luminance = 0x50,
-    .power     = 0x01,
-    .work_mode = 0x02,
-};
+alink_err_t device_data_parse(const char *json_str, const char *key, uint8_t *value)
+{
+    alink_err_t ret = 0;
+    char sub_str[64] = {0};
+    char value_tmp[8] = {0};
 
-const char *device_attr[] = {
-    "ErrorCode",
-    "Hue",
-    "Luminance",
-    "Switch",
-    "WorkMode",
-    NULL
-};
+    ret = alink_json_parse(json_str, key, sub_str);
+    if (ret < 0) return ALINK_ERR;
+    ret = alink_json_parse(sub_str, "value", value_tmp);
+    if (ret < 0) return ALINK_ERR;
 
-const char *main_dev_params =
-    "{\"ErrorCode\":{\"value\":\"%d\"},\"Hue\":{\"value\":\"%d\"},\"Luminance\":{\"value\":\"%d\"},\"Switch\":{\"value\":\"%d\"},\"WorkMode\":{\"value\":\"%d\"}}";
+    *value = atoi(value_tmp);
+    return ALINK_ERR;
+}
 
+alink_err_t device_data_pack(const char *json_str, const char *key, int value)
+{
+    char sub_str[64] = {0};
+    alink_err_t ret = 0;
+
+    ret = alink_json_pack(sub_str, "value", value);
+    if (ret < 0) return ALINK_ERR;
+    ret = alink_json_pack(json_str, key, sub_str);
+    if (ret < 0) return ALINK_ERR;
+    return ALINK_OK;
+}
+
+/**
+ * @brief Activate device
+ */
+const char *activate_data = "{\"ErrorCode\": { \"value\": \"1\" }}";
+alink_err_t alink_activate_device()
+{
+    alink_err_t ret = 0;
+    ret = alink_write(activate_data, ALINK_DATA_LEN, 0);
+        if (ret < 0) ALINK_LOGW("alink_write is err");
+    return ALINK_OK;
+}
+
+alink_err_t proactive_report_data()
+{
+    alink_err_t ret = 0;
+    char *up_cmd = (char *)calloc(1, ALINK_DATA_LEN);
+    dev_info_t light_info = {
+        .errorcode = 0x00,
+        .hue       = 0x10,
+        .luminance = 0x50,
+        .power     = 0x01,
+        .work_mode = 0x02,
+    };
+    device_data_pack(up_cmd, "ErrorCode", light_info.errorcode);
+    device_data_pack(up_cmd, "Hue", light_info.hue);
+    device_data_pack(up_cmd, "Luminance", light_info.luminance);
+    device_data_pack(up_cmd, "Switch", light_info.power);
+    device_data_pack(up_cmd, "WorkMode", light_info.work_mode);
+    ret = alink_write(up_cmd, ALINK_DATA_LEN, 500 / portTICK_PERIOD_MS);
+    free(up_cmd);
+    if (ret < 0) ALINK_LOGW("alink_write is err");
+    return ALINK_OK;
+}
+
+/*
+ * getDeviceStatus: {"attrSet":[],"uuid":"7DD5CE4ECE654B721BE8F4F912C10B8E"}
+ * postDeviceData:  {"ErrorCode":{"value":"0"},"Hue":{"value":"16"},"Luminance":{"value":"80"},"Switch":{"value":"1"},"WorkMode":{"value":"2"}}
+ *                  {"Switch":{"value":"1"},"attrSet":["Switch"],"uuid":"158EE04889E2B1FE4BF18AFE4BFD0F04"}
+ */
 void read_task_test(void *arg)
 {
     char *down_cmd = (char *)malloc(ALINK_DATA_LEN);
     alink_err_t ret = ALINK_ERR;
+    dev_info_t light_info = {
+        .errorcode = 0x00,
+        .hue       = 0x10,
+        .luminance = 0x50,
+        .power     = 0x01,
+        .work_mode = 0x02,
+    };
     for (;;) {
-        ret = esp_alink_read(down_cmd, ALINK_DATA_LEN, portMAX_DELAY);
-        if (ret == ALINK_ERR) {
-            ALINK_LOGW("esp_alink_read is err");
+        ret = alink_read(down_cmd, ALINK_DATA_LEN, portMAX_DELAY);
+        if (ret < 0) {
+            ALINK_LOGW("alink_read is err");
             continue;
         }
 
-        int attrLen = 0, valueLen = 0, value = 0, i = 0;
-        char *valueStr = NULL, *attrStr = NULL;
-        for (i = 0; i < 5; i++) {
-            attrStr = json_get_value_by_name(down_cmd, strlen(down_cmd), device_attr[i], &attrLen, 0);
-            valueStr = json_get_value_by_name(attrStr, attrLen, "value", &valueLen, 0);
-
-            if (valueStr && valueLen > 0) {
-                char lastChar = *(valueStr + valueLen);
-                *(valueStr + valueLen) = 0;
-                value = atoi(valueStr);
-                *(valueStr + valueLen) = lastChar;
-                switch (i) {
-                case 0:
-                    light_info.errorcode = value;
-                    break;
-                case 1:
-                    light_info.hue = value;
-                    break;
-                case 2:
-                    light_info.luminance = value;
-                    break;
-                case 3:
-                    light_info.power = value;
-                    break;
-                case 4:
-                    light_info.work_mode = value;
-                    break;
-                default:
-                    break;
-                }
-            }
+        if (!memcmp(down_cmd, "{\"attrSet\":[]", 13)) {
+            proactive_report_data();
+            continue;
         }
-        ALINK_LOGI("read: errorcode:%d, hue: %d, luminance: %d, Switch: %d, work_mode: %d",
+
+        device_data_parse(down_cmd, "ErrorCode", &(light_info.errorcode));
+        device_data_parse(down_cmd, "Hue", &(light_info.hue));
+        device_data_parse(down_cmd, "Luminance", &(light_info.luminance));
+        device_data_parse(down_cmd, "Switch", &(light_info.power));
+        device_data_parse(down_cmd, "WorkMode", &(light_info.work_mode));
+        ALINK_LOGW("read: errorcode:%d, hue: %d, luminance: %d, Switch: %d, work_mode: %d",
                    light_info.errorcode, light_info.hue, light_info.luminance, light_info.power, light_info.work_mode);
-        xSemaphoreGive(xSemWriteInfo);
+        ret = alink_write(down_cmd, ALINK_DATA_LEN, 0);
+        if (ret < 0) ALINK_LOGW("alink_write is err");
     }
     free(down_cmd);
-    vTaskDelete(NULL);
-}
-
-void write_task_test(void *arg)
-{
-    alink_err_t ret = ALINK_ERR;
-    char *up_cmd = (char *)malloc(ALINK_DATA_LEN);
-    for (;;) {
-        xSemaphoreTake(xSemWriteInfo, portMAX_DELAY);
-        memset(up_cmd, 0, ALINK_DATA_LEN);
-        sprintf(up_cmd, main_dev_params, light_info.errorcode,
-                light_info.hue, light_info.luminance,
-                light_info.power, light_info.work_mode);
-        ret = esp_alink_write(up_cmd, ALINK_DATA_LEN, 500 / portTICK_PERIOD_MS);
-        if (ret == ALINK_ERR) ALINK_LOGW("esp_alink_write is err");
-        platform_msleep(500);
-    }
-    free(up_cmd);
     vTaskDelete(NULL);
 }
 
@@ -133,9 +147,7 @@ alink_err_t alink_event_handler(alink_event_t event)
     switch (event) {
     case ALINK_EVENT_CLOUD_CONNECTED:
         ALINK_LOGD("Alink cloud connected!");
-        if (xSemWriteInfo == NULL)
-            xSemWriteInfo = xSemaphoreCreateBinary();
-        // xSemaphoreGive(xSemWriteInfo);
+        proactive_report_data();
         break;
     case ALINK_EVENT_CLOUD_DISCONNECTED:
         ALINK_LOGD("Alink cloud disconnected!");
@@ -162,12 +174,12 @@ alink_err_t alink_event_handler(alink_event_t event)
         break;
     case ALINK_EVENT_FACTORY_RESET:
         ALINK_LOGD("Requests factory reset");
-        esp_alink_factory_reset();
+        alink_factory_setting();
         break;
     case ALINK_EVENT_ACTIVATE_DEVICE:
         ALINK_LOGD("Requests activate device");
         alink_activate_device();
-        xSemaphoreGive(xSemWriteInfo);
+        proactive_report_data();
         break;
 
     default:
@@ -176,6 +188,9 @@ alink_err_t alink_event_handler(alink_event_t event)
     return ALINK_OK;
 }
 
+/**
+ * @brief This function is only for detecting memory leaks
+ */
 static void free_heap_task(void *arg)
 {
     for (;;) {
@@ -185,14 +200,13 @@ static void free_heap_task(void *arg)
     vTaskDelete(NULL);
 }
 
+
 /******************************************************************************
  * FunctionName : app_main
  * Description  : entry of user application, init user function here
  * Parameters   : none
  * Returns      : none
 *******************************************************************************/
-
-void alink_key_event(void* arg);
 void app_main()
 {
     ALINK_LOGI("free_heap :%u\n", esp_get_free_heap_size());
@@ -203,8 +217,11 @@ void app_main()
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
 
+    /**
+     * @brief You can use other trigger mode, to trigger the distribution network, activation and other operations
+     */
+    xTaskCreate(alink_key_trigger, "alink_key_trigger", 1024 * 2, NULL, 10, NULL);
 
-    if (xSemWriteInfo == NULL) xSemWriteInfo = xSemaphoreCreateBinary();
     alink_product_t product_info = {
         .name           = "alink_product",
         .version        = "1.0.0",
@@ -215,12 +232,8 @@ void app_main()
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
     };
 
-    ESP_ERROR_CHECK( esp_alink_event_init(alink_event_handler) );
-    xTaskCreate(alink_key_event, "alink_key_event", 1024 * 4, NULL, 10, NULL);
-    ESP_ERROR_CHECK( esp_alink_init(&product_info) );
-
+    ESP_ERROR_CHECK( alink_init(&product_info, alink_event_handler) );
     xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
-    xTaskCreate(write_task_test, "write_task_test", 1024 * 2, NULL, 4, NULL);
     xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
 }
 #endif

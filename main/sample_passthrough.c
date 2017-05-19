@@ -58,7 +58,7 @@ void read_task_test(void *arg)
     alink_err_t ret = ALINK_ERR;
     dev_info_t down_cmd;
     for (;;) {
-        ret = esp_alink_read(&down_cmd, sizeof(dev_info_t), portMAX_DELAY);
+        ret = alink_read(&down_cmd, sizeof(dev_info_t), portMAX_DELAY);
         if (ret == ALINK_ERR) {
             ALINK_LOGW("esp_read is err");
             continue;
@@ -84,8 +84,8 @@ void write_task_test(void *arg)
         }
         ALINK_LOGI("write: power:%d, temp_value: %d, light_value: %d, time_delay: %d, work_mode: %d",
                    light_info.power, light_info.temp_value, light_info.light_value, light_info.time_delay, light_info.work_mode);
-        ret = esp_alink_write(&light_info, sizeof(dev_info_t), 500);
-        if (ret == ALINK_ERR) ALINK_LOGW("esp_alink_write is err");
+        ret = alink_write(&light_info, sizeof(dev_info_t), 500);
+        if (ret == ALINK_ERR) ALINK_LOGW("alink_write is err");
         vTaskDelay(500 / portTICK_RATE_MS);
     }
     vTaskDelete(NULL);
@@ -155,8 +155,8 @@ void app_main()
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
     };
 
-    ESP_ERROR_CHECK( esp_alink_event_init(alink_event_handler) );
-    ESP_ERROR_CHECK( esp_alink_init(&product_info) );
+    ESP_ERROR_CHECK( alink_event_init(alink_event_handler) );
+    ESP_ERROR_CHECK( alink_init(&product_info) );
     xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
     xTaskCreate(write_task_test, "write_task_test", 1024 * 2, NULL, 4, NULL);
     xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
