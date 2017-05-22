@@ -38,6 +38,10 @@ typedef struct  virtual_dev {
     uint8_t work_mode;
 } dev_info_t;
 
+/**
+ * @brief  In order to simplify the analysis of json package operations,
+ * use the package alink_json_parse, you can also use the standard cJson data analysis
+ */
 alink_err_t device_data_parse(const char *json_str, const char *key, uint8_t *value)
 {
     alink_err_t ret = 0;
@@ -68,12 +72,12 @@ alink_err_t device_data_pack(const char *json_str, const char *key, int value)
 /**
  * @brief Activate device
  */
-const char *activate_data = "{\"ErrorCode\": { \"value\": \"1\" }}";
+static const char *activate_data = "{\"ErrorCode\": { \"value\": \"1\" }}";
 alink_err_t alink_activate_device()
 {
     alink_err_t ret = 0;
     ret = alink_write(activate_data, ALINK_DATA_LEN, 0);
-        if (ret < 0) ALINK_LOGW("alink_write is err");
+    if (ret < 0) ALINK_LOGW("alink_write is err");
     return ALINK_OK;
 }
 
@@ -101,7 +105,7 @@ alink_err_t proactive_report_data()
 
 /*
  * getDeviceStatus: {"attrSet":[],"uuid":"7DD5CE4ECE654B721BE8F4F912C10B8E"}
- * postDeviceData:  {"ErrorCode":{"value":"0"},"Hue":{"value":"16"},"Luminance":{"value":"80"},"Switch":{"value":"1"},"WorkMode":{"value":"2"}}
+ * postDeviceData: {"Luminance":{"value":"80"},"Switch":{"value":"1"},"attrSet":["Luminance","Switch","Hue","ErrorCode","WorkMode","onlineState"],"Hue":{"value":"16"},"ErrorCode":{"value":"0"},"uuid":"158EE04889E2B1FE4BF18AFE4BFD0F04","WorkMode":{"value":"2"},"onlineState":{"when":"1495184488","value":"on"}
  *                  {"Switch":{"value":"1"},"attrSet":["Switch"],"uuid":"158EE04889E2B1FE4BF18AFE4BFD0F04"}
  */
 void read_task_test(void *arg)
@@ -122,20 +126,31 @@ void read_task_test(void *arg)
             continue;
         }
 
-        if (!memcmp(down_cmd, "{\"attrSet\":[]", 13)) {
-            proactive_report_data();
+        char method_str[32] = {0};
+        ret = alink_json_parse(down_cmd, "method", method_str);
+        if (ret < 0) {
+            ALINK_LOGW("alink_json_parse, ret: %d", ret);
             continue;
         }
 
-        device_data_parse(down_cmd, "ErrorCode", &(light_info.errorcode));
-        device_data_parse(down_cmd, "Hue", &(light_info.hue));
-        device_data_parse(down_cmd, "Luminance", &(light_info.luminance));
-        device_data_parse(down_cmd, "Switch", &(light_info.power));
-        device_data_parse(down_cmd, "WorkMode", &(light_info.work_mode));
-        ALINK_LOGW("read: errorcode:%d, hue: %d, luminance: %d, Switch: %d, work_mode: %d",
-                   light_info.errorcode, light_info.hue, light_info.luminance, light_info.power, light_info.work_mode);
-        ret = alink_write(down_cmd, ALINK_DATA_LEN, 0);
-        if (ret < 0) ALINK_LOGW("alink_write is err");
+        if (!strcmp(method_str, "getDeviceStatus")) {
+            proactive_report_data();
+            continue;
+        } else if (!strcmp(method_str, "setDeviceStatus")) {
+            // ALINK_LOGD("setDeviceStatus: %s", down_cmd);
+            device_data_parse(down_cmd, "ErrorCode", &(light_info.errorcode));
+            device_data_parse(down_cmd, "Hue", &(light_info.hue));
+            device_data_parse(down_cmd, "Luminance", &(light_info.luminance));
+            device_data_parse(down_cmd, "Switch", &(light_info.power));
+            device_data_parse(down_cmd, "WorkMode", &(light_info.work_mode));
+            ALINK_LOGI("read: errorcode:%d, hue: %d, luminance: %d, Switch: %d, work_mode: %d",
+                       light_info.errorcode, light_info.hue, light_info.luminance, light_info.power, light_info.work_mode);
+
+            /* write data is not necessary */
+            ret = alink_write(down_cmd, ALINK_DATA_LEN, 0);
+            if (ret < 0) ALINK_LOGW("alink_write is err");
+        }
+
     }
     free(down_cmd);
     vTaskDelete(NULL);
