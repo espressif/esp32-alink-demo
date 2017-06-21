@@ -42,7 +42,7 @@ typedef struct  virtual_dev {
  * @brief  In order to simplify the analysis of json package operations,
  * use the package alink_json_parse, you can also use the standard cJson data analysis
  */
-alink_err_t device_data_parse(const char *json_str, const char *key, uint8_t *value)
+static alink_err_t device_data_parse(const char *json_str, const char *key, uint8_t *value)
 {
     alink_err_t ret = 0;
     char sub_str[64] = {0};
@@ -57,7 +57,7 @@ alink_err_t device_data_parse(const char *json_str, const char *key, uint8_t *va
     return ALINK_ERR;
 }
 
-alink_err_t device_data_pack(const char *json_str, const char *key, int value)
+static alink_err_t device_data_pack(const char *json_str, const char *key, int value)
 {
     char sub_str[64] = {0};
     alink_err_t ret = 0;
@@ -70,18 +70,25 @@ alink_err_t device_data_pack(const char *json_str, const char *key, int value)
 }
 
 /**
- * @brief Activate device
+ * @brief When the service received errno a jump that is complete activation,
+ *        activation of the order need to modify the specific equipment
  */
 static const char *activate_data = "{\"ErrorCode\": { \"value\": \"1\" }}";
-alink_err_t alink_activate_device()
+static const char *activate_data2 = "{\"ErrorCode\": { \"value\": \"0\" }}";
+static alink_err_t alink_activate_device()
 {
     alink_err_t ret = 0;
-    ret = alink_write(activate_data, ALINK_DATA_LEN, 0);
+    ret = alink_write(activate_data, ALINK_DATA_LEN, 500);
+    ret = alink_write(activate_data2, ALINK_DATA_LEN, 500);
     if (ret < 0) ALINK_LOGW("alink_write is err");
     return ALINK_OK;
 }
 
-alink_err_t proactive_report_data()
+/**
+ * @brief  The alink protocol specifies that the state of the device must be
+ *         proactively attached to the Ali server
+ */
+static alink_err_t proactive_report_data()
 {
     alink_err_t ret = 0;
     char *up_cmd = (char *)calloc(1, ALINK_DATA_LEN);
@@ -92,12 +99,12 @@ alink_err_t proactive_report_data()
         .power     = 0x01,
         .work_mode = 0x02,
     };
-    device_data_pack(up_cmd, "ErrorCode", light_info.errorcode);
+    // device_data_pack(up_cmd, "ErrorCode", light_info.errorcode);
     device_data_pack(up_cmd, "Hue", light_info.hue);
     device_data_pack(up_cmd, "Luminance", light_info.luminance);
     device_data_pack(up_cmd, "Switch", light_info.power);
     device_data_pack(up_cmd, "WorkMode", light_info.work_mode);
-    ret = alink_write(up_cmd, ALINK_DATA_LEN, 500 / portTICK_PERIOD_MS);
+    ret = alink_write(up_cmd, ALINK_DATA_LEN, 500);
     free(up_cmd);
     if (ret < 0) ALINK_LOGW("alink_write is err");
     return ALINK_OK;
@@ -106,19 +113,17 @@ alink_err_t proactive_report_data()
 /*
  * getDeviceStatus: {"attrSet":[],"uuid":"7DD5CE4ECE654B721BE8F4F912C10B8E"}
  * postDeviceData: {"Luminance":{"value":"80"},"Switch":{"value":"1"},"attrSet":["Luminance","Switch","Hue","ErrorCode","WorkMode","onlineState"],"Hue":{"value":"16"},"ErrorCode":{"value":"0"},"uuid":"158EE04889E2B1FE4BF18AFE4BFD0F04","WorkMode":{"value":"2"},"onlineState":{"when":"1495184488","value":"on"}
- *                  {"Switch":{"value":"1"},"attrSet":["Switch"],"uuid":"158EE04889E2B1FE4BF18AFE4BFD0F04"}
+ *                 {"Switch":{"value":"1"},"attrSet":["Switch"],"uuid":"158EE04889E2B1FE4BF18AFE4BFD0F04"}
+ *
+ * @note  read_task_test stack space is small, need to follow the specific
+ *        application to increase the size of the stack
  */
-void read_task_test(void *arg)
+static void read_task_test(void *arg)
 {
     char *down_cmd = (char *)malloc(ALINK_DATA_LEN);
     alink_err_t ret = ALINK_ERR;
-    dev_info_t light_info = {
-        .errorcode = 0x00,
-        .hue       = 0x10,
-        .luminance = 0x50,
-        .power     = 0x01,
-        .work_mode = 0x02,
-    };
+    dev_info_t light_info;
+
     for (;;) {
         ret = alink_read(down_cmd, ALINK_DATA_LEN, portMAX_DELAY);
         if (ret < 0) {
@@ -150,18 +155,18 @@ void read_task_test(void *arg)
             ret = alink_write(down_cmd, ALINK_DATA_LEN, 0);
             if (ret < 0) ALINK_LOGW("alink_write is err");
         }
-
     }
     free(down_cmd);
     vTaskDelete(NULL);
 }
 
-int count = 0;
-alink_err_t alink_event_handler(alink_event_t event)
+static int count = 0; /*!< Count the number of packets received */
+static alink_err_t alink_event_handler(alink_event_t event)
 {
     switch (event) {
     case ALINK_EVENT_CLOUD_CONNECTED:
         ALINK_LOGD("Alink cloud connected!");
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
         proactive_report_data();
         break;
     case ALINK_EVENT_CLOUD_DISCONNECTED:
@@ -194,7 +199,6 @@ alink_err_t alink_event_handler(alink_event_t event)
     case ALINK_EVENT_ACTIVATE_DEVICE:
         ALINK_LOGD("Requests activate device");
         alink_activate_device();
-        proactive_report_data();
         break;
 
     default:
@@ -224,7 +228,7 @@ static void free_heap_task(void *arg)
 *******************************************************************************/
 void app_main()
 {
-    ALINK_LOGI("free_heap :%u\n", esp_get_free_heap_size());
+    ALINK_LOGI("alink embed v1.0.0 free_heap :%u\n", esp_get_free_heap_size());
     nvs_flash_init();
     tcpip_adapter_init();
     ESP_ERROR_CHECK( esp_event_loop_init(NULL, NULL) );
@@ -239,7 +243,7 @@ void app_main()
 
     alink_product_t product_info = {
         .name           = "alink_product",
-        .version        = "1.0.0",
+        .version        = "1.0.1",
         .model          = "ALINKTEST_LIVING_LIGHT_ALINK_TEST",
         .key            = "5gPFl8G4GyFZ1fPWk20m",
         .secret         = "ngthgTlZ65bX5LpViKIWNsDPhOf2As9ChnoL9gQb",
