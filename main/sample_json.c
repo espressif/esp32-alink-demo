@@ -8,6 +8,8 @@
  * Modification history:
  * 2016/11/16, v0.0.1 create this file.
 *******************************************************************************/
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -22,9 +24,9 @@
 #include "nvs_flash.h"
 
 #include "esp_alink.h"
-#include "product.h"
+#include "alink_product.h"
 #include "cJSON.h"
-#include "alink_json_parser.h"
+#include "esp_json_parser.h"
 
 #ifndef ALINK_PASSTHROUGH
 static const char *TAG = "sample_json";
@@ -48,9 +50,9 @@ static alink_err_t device_data_parse(const char *json_str, const char *key, uint
     char sub_str[64] = {0};
     char value_tmp[8] = {0};
 
-    ret = alink_json_parse(json_str, key, sub_str);
+    ret = esp_json_parse(json_str, key, sub_str);
     if (ret < 0) return ALINK_ERR;
-    ret = alink_json_parse(sub_str, "value", value_tmp);
+    ret = esp_json_parse(sub_str, "value", value_tmp);
     if (ret < 0) return ALINK_ERR;
 
     *value = atoi(value_tmp);
@@ -62,9 +64,9 @@ static alink_err_t device_data_pack(const char *json_str, const char *key, int v
     char sub_str[64] = {0};
     alink_err_t ret = 0;
 
-    ret = alink_json_pack(sub_str, "value", value);
+    ret = esp_json_pack(sub_str, "value", value);
     if (ret < 0) return ALINK_ERR;
-    ret = alink_json_pack(json_str, key, sub_str);
+    ret = esp_json_pack(json_str, key, sub_str);
     if (ret < 0) return ALINK_ERR;
     return ALINK_OK;
 }
@@ -132,7 +134,7 @@ static void read_task_test(void *arg)
         }
 
         char method_str[32] = {0};
-        ret = alink_json_parse(down_cmd, "method", method_str);
+        ret = esp_json_parse(down_cmd, "method", method_str);
         if (ret < 0) {
             ALINK_LOGW("alink_json_parse, ret: %d", ret);
             continue;
@@ -166,8 +168,8 @@ static alink_err_t alink_event_handler(alink_event_t event)
     switch (event) {
     case ALINK_EVENT_CLOUD_CONNECTED:
         ALINK_LOGD("Alink cloud connected!");
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
         proactive_report_data();
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
         break;
     case ALINK_EVENT_CLOUD_DISCONNECTED:
         ALINK_LOGD("Alink cloud disconnected!");

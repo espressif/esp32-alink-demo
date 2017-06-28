@@ -14,7 +14,9 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_system.h"
+
 #include "esp_alink.h"
+#include "esp_alink_log.h"
 #include "esp_info_store.h"
 
 #define ESP_INTR_FLAG_DEFAULT 0
