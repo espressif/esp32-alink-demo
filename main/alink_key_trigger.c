@@ -20,6 +20,7 @@
 #include "esp_info_store.h"
 
 #define ESP_INTR_FLAG_DEFAULT 0
+#define ALINK_RESET_KEY_IO    0
 
 static const char *TAG = "alink_factory_reset";
 static xQueueHandle gpio_evt_queue = NULL;
@@ -69,6 +70,7 @@ alink_err_t alink_key_scan(TickType_t ticks_to_wait)
     BaseType_t lift_key = pdFALSE;
 
     int backup_time = 0;
+
     for (;;) {
         ret = xQueueReceive(gpio_evt_queue, &io_num, ticks_to_wait);
         ALINK_ERROR_CHECK(ret != pdTRUE, ALINK_ERR, "xQueueReceive, ret:%d", ret);
@@ -80,9 +82,11 @@ alink_err_t alink_key_scan(TickType_t ticks_to_wait)
             lift_key = pdTRUE;
             backup_time = system_get_time() - backup_time;
         }
+
         if (press_key & lift_key) {
             press_key = pdFALSE;
             lift_key = pdFALSE;
+
             if (backup_time > 5000000) {
                 return ALINK_KEY_LONG_PRESS;
             } else if (backup_time > 1000000) {
@@ -98,25 +102,26 @@ void alink_key_trigger(void *arg)
 {
     alink_err_t ret = 0;
     alink_key_init(ALINK_RESET_KEY_IO);
+
     for (;;) {
         ret = alink_key_scan(portMAX_DELAY);
         ALINK_ERROR_CHECK(ret == ALINK_ERR, vTaskDelete(NULL), "alink_key_scan ret:%d", ret);
 
         switch (ret) {
-        case ALINK_KEY_SHORT_PRESS:
-            alink_event_send(ALINK_EVENT_ACTIVATE_DEVICE);
-            break;
+            case ALINK_KEY_SHORT_PRESS:
+                alink_event_send(ALINK_EVENT_ACTIVATE_DEVICE);
+                break;
 
-        case ALINK_KEY_MEDIUM_PRESS:
-            alink_event_send(ALINK_EVENT_UPDATE_ROUTER);
-            break;
+            case ALINK_KEY_MEDIUM_PRESS:
+                alink_event_send(ALINK_EVENT_UPDATE_ROUTER);
+                break;
 
-        case ALINK_KEY_LONG_PRESS:
-            alink_event_send(ALINK_EVENT_FACTORY_RESET);
-            break;
+            case ALINK_KEY_LONG_PRESS:
+                alink_event_send(ALINK_EVENT_FACTORY_RESET);
+                break;
 
-        default:
-            break;
+            default:
+                break;
         }
     }
 

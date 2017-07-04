@@ -51,9 +51,16 @@ static alink_err_t device_data_parse(const char *json_str, const char *key, uint
     char value_tmp[8] = {0};
 
     ret = esp_json_parse(json_str, key, sub_str);
-    if (ret < 0) return ALINK_ERR;
+
+    if (ret < 0) {
+        return ALINK_ERR;
+    }
+
     ret = esp_json_parse(sub_str, "value", value_tmp);
-    if (ret < 0) return ALINK_ERR;
+
+    if (ret < 0) {
+        return ALINK_ERR;
+    }
 
     *value = atoi(value_tmp);
     return ALINK_ERR;
@@ -65,9 +72,17 @@ static alink_err_t device_data_pack(const char *json_str, const char *key, int v
     alink_err_t ret = 0;
 
     ret = esp_json_pack(sub_str, "value", value);
-    if (ret < 0) return ALINK_ERR;
+
+    if (ret < 0) {
+        return ALINK_ERR;
+    }
+
     ret = esp_json_pack(json_str, key, sub_str);
-    if (ret < 0) return ALINK_ERR;
+
+    if (ret < 0) {
+        return ALINK_ERR;
+    }
+
     return ALINK_OK;
 }
 
@@ -80,9 +95,13 @@ static const char *activate_data2 = "{\"ErrorCode\": { \"value\": \"0\" }}";
 static alink_err_t alink_activate_device()
 {
     alink_err_t ret = 0;
-    ret = alink_write(activate_data, ALINK_DATA_LEN, 500);
-    ret = alink_write(activate_data2, ALINK_DATA_LEN, 500);
-    if (ret < 0) ALINK_LOGW("alink_write is err");
+    ret = alink_write(activate_data, strlen(activate_data) + 1, 100);
+    ret = alink_write(activate_data2, strlen(activate_data) + 1, 100);
+
+    if (ret < 0) {
+        ALINK_LOGW("alink_write is err");
+    }
+
     return ALINK_OK;
 }
 
@@ -106,9 +125,13 @@ static alink_err_t proactive_report_data()
     device_data_pack(up_cmd, "Luminance", light_info.luminance);
     device_data_pack(up_cmd, "Switch", light_info.power);
     device_data_pack(up_cmd, "WorkMode", light_info.work_mode);
-    ret = alink_write(up_cmd, ALINK_DATA_LEN, 500);
+    ret = alink_write(up_cmd, strlen(up_cmd) + 1, 500);
     free(up_cmd);
-    if (ret < 0) ALINK_LOGW("alink_write is err");
+
+    if (ret < 0) {
+        ALINK_LOGW("alink_write is err");
+    }
+
     return ALINK_OK;
 }
 
@@ -128,6 +151,7 @@ static void read_task_test(void *arg)
 
     for (;;) {
         ret = alink_read(down_cmd, ALINK_DATA_LEN, portMAX_DELAY);
+
         if (ret < 0) {
             ALINK_LOGW("alink_read is err");
             continue;
@@ -135,6 +159,7 @@ static void read_task_test(void *arg)
 
         char method_str[32] = {0};
         ret = esp_json_parse(down_cmd, "method", method_str);
+
         if (ret < 0) {
             ALINK_LOGW("alink_json_parse, ret: %d", ret);
             continue;
@@ -154,10 +179,14 @@ static void read_task_test(void *arg)
                        light_info.errorcode, light_info.hue, light_info.luminance, light_info.power, light_info.work_mode);
 
             /* write data is not necessary */
-            ret = alink_write(down_cmd, ALINK_DATA_LEN, 0);
-            if (ret < 0) ALINK_LOGW("alink_write is err");
+            ret = alink_write(down_cmd, strlen(down_cmd) + 1, 0);
+
+            if (ret < 0) {
+                ALINK_LOGW("alink_write is err");
+            }
         }
     }
+
     free(down_cmd);
     vTaskDelete(NULL);
 }
@@ -166,46 +195,64 @@ static int count = 0; /*!< Count the number of packets received */
 static alink_err_t alink_event_handler(alink_event_t event)
 {
     switch (event) {
-    case ALINK_EVENT_CLOUD_CONNECTED:
-        ALINK_LOGD("Alink cloud connected!");
-        proactive_report_data();
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-        break;
-    case ALINK_EVENT_CLOUD_DISCONNECTED:
-        ALINK_LOGD("Alink cloud disconnected!");
-        break;
-    case ALINK_EVENT_GET_DEVICE_DATA:
-        ALINK_LOGD("The cloud initiates a query to the device");
-        break;
-    case ALINK_EVENT_SET_DEVICE_DATA:
-        count++;
-        ALINK_LOGD("The cloud is set to send instructions");
-        break;
-    case ALINK_EVENT_POST_CLOUD_DATA:
-        ALINK_LOGD("The device post data success!");
-        break;
-    case ALINK_EVENT_STA_DISCONNECTED:
-        ALINK_LOGD("Wifi disconnected");
-        break;
-    case ALINK_EVENT_CONFIG_NETWORK:
-        ALINK_LOGD("Enter the network configuration mode");
-        break;
-    case ALINK_EVENT_UPDATE_ROUTER:
-        ALINK_LOGD("Requests update router");
-        alink_update_router();
-        break;
-    case ALINK_EVENT_FACTORY_RESET:
-        ALINK_LOGD("Requests factory reset");
-        alink_factory_setting();
-        break;
-    case ALINK_EVENT_ACTIVATE_DEVICE:
-        ALINK_LOGD("Requests activate device");
-        alink_activate_device();
-        break;
+        case ALINK_EVENT_CLOUD_CONNECTED:
+            ALINK_LOGD("Alink cloud connected!");
+            proactive_report_data();
 
-    default:
-        break;
+            int wifi_mode = 0;
+            ESP_ERROR_CHECK(esp_wifi_get_mode(&wifi_mode));
+
+            if (wifi_mode == WIFI_MODE_APSTA) {
+                break;
+            }
+
+            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+            break;
+
+        case ALINK_EVENT_CLOUD_DISCONNECTED:
+            ALINK_LOGD("Alink cloud disconnected!");
+            break;
+
+        case ALINK_EVENT_GET_DEVICE_DATA:
+            ALINK_LOGD("The cloud initiates a query to the device");
+            break;
+
+        case ALINK_EVENT_SET_DEVICE_DATA:
+            count++;
+            ALINK_LOGD("The cloud is set to send instructions");
+            break;
+
+        case ALINK_EVENT_POST_CLOUD_DATA:
+            ALINK_LOGD("The device post data success!");
+            break;
+
+        case ALINK_EVENT_STA_DISCONNECTED:
+            ALINK_LOGD("Wifi disconnected");
+            break;
+
+        case ALINK_EVENT_CONFIG_NETWORK:
+            ALINK_LOGD("Enter the network configuration mode");
+            break;
+
+        case ALINK_EVENT_UPDATE_ROUTER:
+            ALINK_LOGD("Requests update router");
+            alink_update_router();
+            break;
+
+        case ALINK_EVENT_FACTORY_RESET:
+            ALINK_LOGD("Requests factory reset");
+            alink_factory_setting();
+            break;
+
+        case ALINK_EVENT_ACTIVATE_DEVICE:
+            ALINK_LOGD("Requests activate device");
+            alink_activate_device();
+            break;
+
+        default:
+            break;
     }
+
     return ALINK_OK;
 }
 
@@ -218,9 +265,9 @@ static void free_heap_task(void *arg)
         ALINK_LOGI("free heap size: %d, count: %d", esp_get_free_heap_size(), count);
         vTaskDelay(5000 / portTICK_RATE_MS);
     }
+
     vTaskDelete(NULL);
 }
-
 
 /******************************************************************************
  * FunctionName : app_main
@@ -233,19 +280,20 @@ void app_main()
     ALINK_LOGI("alink embed v1.0.0 free_heap :%u\n", esp_get_free_heap_size());
     nvs_flash_init();
     tcpip_adapter_init();
-    ESP_ERROR_CHECK( esp_event_loop_init(NULL, NULL) );
+    ESP_ERROR_CHECK(esp_event_loop_init(NULL, NULL));
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
-    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 
     /**
      * @brief You can use other trigger mode, to trigger the distribution network, activation and other operations
      */
+    extern void alink_key_trigger(void *arg);
     xTaskCreate(alink_key_trigger, "alink_key_trigger", 1024 * 2, NULL, 10, NULL);
 
-    alink_product_t product_info = {
+    const alink_product_t product_info = {
         .name           = "alink_product",
-        .version        = "1.0.1",
+        .version        = "1.0.0",
         .model          = "ALINKTEST_LIVING_LIGHT_ALINK_TEST",
         .key            = "5gPFl8G4GyFZ1fPWk20m",
         .secret         = "ngthgTlZ65bX5LpViKIWNsDPhOf2As9ChnoL9gQb",
@@ -253,7 +301,8 @@ void app_main()
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
     };
 
-    ESP_ERROR_CHECK( alink_init(&product_info, alink_event_handler) );
+    ESP_ERROR_CHECK(alink_init(&product_info, alink_event_handler));
+
     xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
     xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
 }
