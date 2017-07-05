@@ -1,6 +1,6 @@
+[submodule "components/esp32-alink-embed"]
+	path = components/esp32-alink-embed
+	url = ssh://git@gitlab.espressif.cn:27227/cloud/esp32-alink-embed.git
 [submodule "esp-idf"]
 	path = esp-idf
-	url = https://github.com/espressif/esp-idf.git
-[submodule "components/esp32-alink_embed"]
-	path = components/esp32-alink_embed
-	url = ssh://git@gitlab.espressif.cn:27227/cloud/esp-alink-v2.0.git
+	url = ssh://git@gitlab.espressif.cn:27227/idf/esp-idf.git
