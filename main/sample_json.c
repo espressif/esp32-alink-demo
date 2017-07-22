@@ -19,6 +19,7 @@
 #include "esp_wifi.h"
 #include "esp_err.h"
 #include "esp_system.h"
+#include "esp_spi_flash.h"
 
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -27,6 +28,7 @@
 #include "alink_product.h"
 #include "cJSON.h"
 #include "esp_json_parser.h"
+#include "alink_export.h"
 
 #ifndef ALINK_PASSTHROUGH
 static const char *TAG = "sample_json";
@@ -176,7 +178,8 @@ static void read_task_test(void *arg)
             device_data_parse(down_cmd, "Switch", &(light_info.power));
             device_data_parse(down_cmd, "WorkMode", &(light_info.work_mode));
             ALINK_LOGI("read: errorcode:%d, hue: %d, luminance: %d, Switch: %d, work_mode: %d",
-                       light_info.errorcode, light_info.hue, light_info.luminance, light_info.power, light_info.work_mode);
+                       light_info.errorcode, light_info.hue, light_info.luminance,
+                       light_info.power, light_info.work_mode);
 
             /* write data is not necessary */
             ret = alink_write(down_cmd, strlen(down_cmd) + 1, 0);
@@ -199,7 +202,7 @@ static alink_err_t alink_event_handler(alink_event_t event)
             ALINK_LOGD("Alink cloud connected!");
             proactive_report_data();
 
-            int wifi_mode = 0;
+            wifi_mode_t wifi_mode = 0;
             ESP_ERROR_CHECK(esp_wifi_get_mode(&wifi_mode));
 
             if (wifi_mode == WIFI_MODE_APSTA) {
@@ -269,6 +272,33 @@ static void free_heap_task(void *arg)
     vTaskDelete(NULL);
 }
 
+/**
+ * @brief Too much serial print information will not be able to pass high-frequency
+ *        send and receive data test
+ *
+ * @Note When GPIO2 is connected to 3V3 and restarts the device, the log level will be modified
+ */
+void reduce_serial_print()
+{
+    gpio_config_t io_conf;
+    //interrupt of rising edge
+    io_conf.intr_type = GPIO_INTR_ANYEDGE;
+    //bit mask of the pins, use GPIO4/5 here
+    io_conf.pin_bit_mask = 1 << 2;
+    //set as input mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //enable pull-up mode
+    io_conf.pull_up_en = 1;
+    gpio_config(&io_conf);
+
+    if (gpio_get_level(2) == 1) {
+        ALINK_LOGI("*********************************");
+        ALINK_LOGI("*       SET LOGLEVEL INFO       *");
+        ALINK_LOGI("*********************************");
+        alink_set_loglevel(ALINK_LL_INFO);
+    }
+}
+
 /******************************************************************************
  * FunctionName : app_main
  * Description  : entry of user application, init user function here
@@ -277,7 +307,23 @@ static void free_heap_task(void *arg)
 *******************************************************************************/
 void app_main()
 {
-    ALINK_LOGI("alink embed v1.0.0 free_heap :%u\n", esp_get_free_heap_size());
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+
+    ALINK_LOGI("================= SYSTEM INFO ================");
+    ALINK_LOGI("compile time     : %s %s", __DATE__, __TIME__);
+    ALINK_LOGI("free heap        : %dB", esp_get_free_heap_size());
+    ALINK_LOGI("idf version      : %s", esp_get_idf_version());
+    ALINK_LOGI("CPU cores        : %d", chip_info.cores);
+    ALINK_LOGI("chip name        : %s", ALINK_CHIPID);
+    ALINK_LOGI("modle name       : %s", ALINK_MODULE_NAME);
+    ALINK_LOGI("function         : WiFi%s%s",
+               (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
+               (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
+    ALINK_LOGI("silicon revision : %d", chip_info.revision);
+    ALINK_LOGI("flash            : %dMB %s\n", spi_flash_get_chip_size() / (1024 * 1024),
+               (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+
     nvs_flash_init();
     tcpip_adapter_init();
     ESP_ERROR_CHECK(esp_event_loop_init(NULL, NULL));
@@ -302,7 +348,7 @@ void app_main()
     };
 
     ESP_ERROR_CHECK(alink_init(&product_info, alink_event_handler));
-
+    reduce_serial_print();
     xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
     xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
 }
