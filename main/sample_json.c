@@ -229,7 +229,7 @@ static alink_err_t alink_event_handler(alink_event_t event)
             ALINK_LOGD("The device post data success!");
             break;
 
-        case ALINK_EVENT_STA_DISCONNECTED:
+        case ALINK_EVENT_WIFI_DISCONNECTED:
             ALINK_LOGD("Wifi disconnected");
             break;
 
@@ -299,6 +299,7 @@ void reduce_serial_print()
     }
 }
 
+
 /******************************************************************************
  * FunctionName : app_main
  * Description  : entry of user application, init user function here
@@ -324,7 +325,7 @@ void app_main()
     ALINK_LOGI("flash            : %dMB %s\n", spi_flash_get_chip_size() / (1024 * 1024),
                (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
-    nvs_flash_init();
+    ESP_ERROR_CHECK(nvs_flash_init());
     tcpip_adapter_init();
     ESP_ERROR_CHECK(esp_event_loop_init(NULL, NULL));
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -339,17 +340,28 @@ void app_main()
 
     const alink_product_t product_info = {
         .name           = "alink_product",
+        /*!< Product version number, ota upgrade need to be modified */
         .version        = "1.0.0",
         .model          = "ALINKTEST_LIVING_LIGHT_ALINK_TEST",
+        /*!< The Key-value pair used in the product */
         .key            = "5gPFl8G4GyFZ1fPWk20m",
         .secret         = "ngthgTlZ65bX5LpViKIWNsDPhOf2As9ChnoL9gQb",
+        /*!< The Key-value pair used in the sandbox environment */
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
+
+#ifdef CONFIG_ALINK_VERSION_SDS
+        /**
+         * @brief As a unique identifier for the sds device
+         */
+        .key_device     = "vfyjJdC0O6b2P3UZXq4g",
+        .secret_device  = "puAxGjMbb4gd2beaapvMPZN4akedB3Xk",
+#endif
     };
 
     ESP_ERROR_CHECK(alink_init(&product_info, alink_event_handler));
     reduce_serial_print();
-    xTaskCreate(read_task_test, "read_task_test", 1024 * 2, NULL, 9, NULL);
+    xTaskCreate(read_task_test, "read_task_test", 1024 * 4, NULL, 9, NULL);
     xTaskCreate(free_heap_task, "free_heap_task", 1024 * 2, NULL, 3, NULL);
 }
 #endif

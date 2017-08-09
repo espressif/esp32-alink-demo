@@ -11,8 +11,8 @@ if [ ! -d "bin" ]; then
   mkdir bin
 fi
 
-if [ ! -d "log" ]; then
-  mkdir log
+if [ ! -d "alink_log" ]; then
+  mkdir alink_log
 fi
 
 # make clean
@@ -35,7 +35,7 @@ cp  build/*.elf bin
 cp  build/*.map bin
 
 if [ ! -n "$1" ] ;then
-    log_file_name="log/"$(date "+%Y-%m-%d_%H-%M-%S")".log"
+    log_file_name="alink_log/"$(date "+%Y-%m-%d_%H-%M-%S")".log"
     make erase_flash flash monitor | tee $log_file_name
 else
     cd bin
@@ -43,7 +43,7 @@ else
     python esptool.py --chip esp32 --port /dev/ttyUSB$1 --baud 1152000 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader.bin 0x10000 *alink*.bin 0x8000 partitions_two_ota.bin
     cd -
 
-    log_file_name="log/ttyUSB$1_"$(date "+%Y-%m-%d_%H-%M-%S")".log"
+    log_file_name="alink_log/ttyUSB$1_"$(date "+%Y-%m-%d_%H-%M-%S")".log"
     # pkill minicom
     minicom -D /dev/ttyUSB$1 -c on -C "$log_file_name"
 fi
