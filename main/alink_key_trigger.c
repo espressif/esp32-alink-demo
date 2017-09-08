@@ -19,6 +19,12 @@
 #include "esp_alink_log.h"
 #include "esp_info_store.h"
 
+typedef enum {
+    ALINK_KEY_SHORT_PRESS = 1,
+    ALINK_KEY_MEDIUM_PRESS,
+    ALINK_KEY_LONG_PRESS,
+} alink_key_t;
+
 #define ESP_INTR_FLAG_DEFAULT 0
 #define ALINK_RESET_KEY_IO    0
 
@@ -55,12 +61,6 @@ void alink_key_init(uint32_t key_gpio_pin)
     //hook isr handler for specific gpio pin
     gpio_isr_handler_add(key_gpio_pin, gpio_isr_handler, (void *) key_gpio_pin);
 }
-
-typedef enum {
-    ALINK_KEY_SHORT_PRESS = 1,
-    ALINK_KEY_MEDIUM_PRESS,
-    ALINK_KEY_LONG_PRESS,
-} alink_key_t;
 
 alink_err_t alink_key_scan(TickType_t ticks_to_wait)
 {
