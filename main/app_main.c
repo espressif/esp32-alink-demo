@@ -42,25 +42,27 @@ typedef struct  virtual_dev {
     uint8_t work_mode;
 } dev_info_t;
 
+static dev_info_t g_light_info = {
+    .errorcode = 0x00,
+    .hue       = 0x10,
+    .luminance = 0x50,
+    .power     = 0x01,
+    .work_mode = 0x02,
+};
 /**
  * @brief  In order to simplify the analysis of json package operations,
  * use the package alink_json_parse, you can also use the standard cJson data analysis
  */
 static alink_err_t device_data_parse(const char *json_str, const char *key, uint8_t *value)
 {
-    alink_err_t ret = 0;
     char sub_str[64] = {0};
     char value_tmp[8] = {0};
 
-    ret = esp_json_parse(json_str, key, sub_str);
-
-    if (ret < 0) {
+    if (esp_json_parse(json_str, key, sub_str) < 0) {
         return ALINK_ERR;
     }
 
-    ret = esp_json_parse(sub_str, "value", value_tmp);
-
-    if (ret < 0) {
+    if (esp_json_parse(sub_str, "value", value_tmp) < 0) {
         return ALINK_ERR;
     }
 
@@ -71,17 +73,12 @@ static alink_err_t device_data_parse(const char *json_str, const char *key, uint
 static alink_err_t device_data_pack(const char *json_str, const char *key, int value)
 {
     char sub_str[64] = {0};
-    alink_err_t ret = 0;
 
-    ret = esp_json_pack(sub_str, "value", value);
-
-    if (ret < 0) {
+    if (esp_json_pack(sub_str, "value", value) < 0) {
         return ALINK_ERR;
     }
 
-    ret = esp_json_pack(json_str, key, sub_str);
-
-    if (ret < 0) {
+    if (esp_json_pack(json_str, key, sub_str) < 0) {
         return ALINK_ERR;
     }
 
@@ -92,17 +89,18 @@ static alink_err_t device_data_pack(const char *json_str, const char *key, int v
  * @brief When the service received errno a jump that is complete activation,
  *        activation of the order need to modify the specific equipment
  */
-static const char *activate_data = "{\"ErrorCode\": { \"value\": \"1\" }}";
-static const char *activate_data2 = "{\"ErrorCode\": { \"value\": \"0\" }}";
 static alink_err_t alink_activate_device()
 {
     alink_err_t ret = 0;
-    ret = alink_write(activate_data, strlen(activate_data) + 1, 100);
-    ret = alink_write(activate_data2, strlen(activate_data) + 1, 100);
+    const char *activate_data = NULL;
 
-    if (ret < 0) {
-        ALINK_LOGW("alink_write is err");
-    }
+    activate_data = "{\"ErrorCode\": { \"value\": \"1\" }}";
+    ret = alink_write(activate_data, strlen(activate_data) + 1, 200);
+    ALINK_ERROR_CHECK(ret < 0, ALINK_ERR, "alink_write, ret: %d", ret);
+
+    activate_data = "{\"ErrorCode\": { \"value\": \"0\" }}";
+    ret = alink_write(activate_data, strlen(activate_data) + 1, 200);
+    ALINK_ERROR_CHECK(ret < 0, ALINK_ERR, "alink_write, ret: %d", ret);
 
     return ALINK_OK;
 }
@@ -115,18 +113,11 @@ static alink_err_t proactive_report_data()
 {
     alink_err_t ret = 0;
     char *up_cmd = (char *)calloc(1, ALINK_DATA_LEN);
-    dev_info_t light_info = {
-        .errorcode = 0x00,
-        .hue       = 0x10,
-        .luminance = 0x50,
-        .power     = 0x01,
-        .work_mode = 0x02,
-    };
-    // device_data_pack(up_cmd, "ErrorCode", light_info.errorcode);
-    device_data_pack(up_cmd, "Hue", light_info.hue);
-    device_data_pack(up_cmd, "Luminance", light_info.luminance);
-    device_data_pack(up_cmd, "Switch", light_info.power);
-    device_data_pack(up_cmd, "WorkMode", light_info.work_mode);
+
+    device_data_pack(up_cmd, "Hue", g_light_info.hue);
+    device_data_pack(up_cmd, "Luminance", g_light_info.luminance);
+    device_data_pack(up_cmd, "Switch", g_light_info.power);
+    device_data_pack(up_cmd, "WorkMode", g_light_info.work_mode);
     ret = alink_write(up_cmd, strlen(up_cmd) + 1, 500);
     free(up_cmd);
 
@@ -148,22 +139,16 @@ static alink_err_t proactive_report_data()
 static void read_task_test(void *arg)
 {
     char *down_cmd = (char *)malloc(ALINK_DATA_LEN);
-    alink_err_t ret = ALINK_ERR;
-    dev_info_t light_info;
 
     for (;;) {
-        ret = alink_read(down_cmd, ALINK_DATA_LEN, portMAX_DELAY);
-
-        if (ret < 0) {
+        if (alink_read(down_cmd, ALINK_DATA_LEN, portMAX_DELAY) < 0) {
             ALINK_LOGW("alink_read is err");
             continue;
         }
 
         char method_str[32] = {0};
-        ret = esp_json_parse(down_cmd, "method", method_str);
-
-        if (ret < 0) {
-            ALINK_LOGW("alink_json_parse, ret: %d", ret);
+        if (esp_json_parse(down_cmd, "method", method_str) < 0) {
+            ALINK_LOGW("alink_json_parse, is err");
             continue;
         }
 
@@ -171,20 +156,18 @@ static void read_task_test(void *arg)
             proactive_report_data();
             continue;
         } else if (!strcmp(method_str, "setDeviceStatus")) {
-            // ALINK_LOGD("setDeviceStatus: %s", down_cmd);
-            device_data_parse(down_cmd, "ErrorCode", &(light_info.errorcode));
-            device_data_parse(down_cmd, "Hue", &(light_info.hue));
-            device_data_parse(down_cmd, "Luminance", &(light_info.luminance));
-            device_data_parse(down_cmd, "Switch", &(light_info.power));
-            device_data_parse(down_cmd, "WorkMode", &(light_info.work_mode));
+            ALINK_LOGV("setDeviceStatus: %s", down_cmd);
+            device_data_parse(down_cmd, "ErrorCode", &(g_light_info.errorcode));
+            device_data_parse(down_cmd, "Hue", &(g_light_info.hue));
+            device_data_parse(down_cmd, "Luminance", &(g_light_info.luminance));
+            device_data_parse(down_cmd, "Switch", &(g_light_info.power));
+            device_data_parse(down_cmd, "WorkMode", &(g_light_info.work_mode));
             ALINK_LOGI("read: errorcode:%d, hue: %d, luminance: %d, Switch: %d, work_mode: %d",
-                       light_info.errorcode, light_info.hue, light_info.luminance,
-                       light_info.power, light_info.work_mode);
+                       g_light_info.errorcode, g_light_info.hue, g_light_info.luminance,
+                       g_light_info.power, g_light_info.work_mode);
 
             /* write data is not necessary */
-            ret = alink_write(down_cmd, strlen(down_cmd) + 1, 0);
-
-            if (ret < 0) {
+            if (alink_write(down_cmd, strlen(down_cmd) + 1, 0) < 0) {
                 ALINK_LOGW("alink_write is err");
             }
         }
@@ -194,66 +177,64 @@ static void read_task_test(void *arg)
     vTaskDelete(NULL);
 }
 
-static int count = 0; /*!< Count the number of packets received */
 static alink_err_t alink_event_handler(alink_event_t event)
 {
     switch (event) {
-        case ALINK_EVENT_CLOUD_CONNECTED:
-            ALINK_LOGD("Alink cloud connected!");
-            proactive_report_data();
+    case ALINK_EVENT_CLOUD_CONNECTED:
+        ALINK_LOGD("Alink cloud connected!");
+        proactive_report_data();
 
-            wifi_mode_t wifi_mode = 0;
-            ESP_ERROR_CHECK(esp_wifi_get_mode(&wifi_mode));
+        /*!< zero configuration configuration need to open the softap */
+        wifi_mode_t wifi_mode = 0;
+        ESP_ERROR_CHECK(esp_wifi_get_mode(&wifi_mode));
 
-            if (wifi_mode == WIFI_MODE_APSTA) {
-                break;
-            }
-
+        if (wifi_mode != WIFI_MODE_APSTA) {
             ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-            break;
+        }
 
-        case ALINK_EVENT_CLOUD_DISCONNECTED:
-            ALINK_LOGD("Alink cloud disconnected!");
-            break;
+        break;
 
-        case ALINK_EVENT_GET_DEVICE_DATA:
-            ALINK_LOGD("The cloud initiates a query to the device");
-            break;
+    case ALINK_EVENT_CLOUD_DISCONNECTED:
+        ALINK_LOGD("Alink cloud disconnected!");
+        break;
 
-        case ALINK_EVENT_SET_DEVICE_DATA:
-            count++;
-            ALINK_LOGD("The cloud is set to send instructions");
-            break;
+    case ALINK_EVENT_GET_DEVICE_DATA:
+        ALINK_LOGD("The cloud initiates a query to the device");
+        break;
 
-        case ALINK_EVENT_POST_CLOUD_DATA:
-            ALINK_LOGD("The device post data success!");
-            break;
+    case ALINK_EVENT_SET_DEVICE_DATA:
+        ALINK_LOGD("The cloud is set to send instructions");
+        break;
 
-        case ALINK_EVENT_WIFI_DISCONNECTED:
-            ALINK_LOGD("Wifi disconnected");
-            break;
+    case ALINK_EVENT_POST_CLOUD_DATA:
+        ALINK_LOGD("The device post data success!");
+        break;
 
-        case ALINK_EVENT_CONFIG_NETWORK:
-            ALINK_LOGD("Enter the network configuration mode");
-            break;
+    case ALINK_EVENT_WIFI_DISCONNECTED:
+        ALINK_LOGD("Wifi disconnected");
+        break;
 
-        case ALINK_EVENT_UPDATE_ROUTER:
-            ALINK_LOGD("Requests update router");
-            alink_update_router();
-            break;
+    case ALINK_EVENT_CONFIG_NETWORK:
+        ALINK_LOGD("Enter the network configuration mode");
+        break;
 
-        case ALINK_EVENT_FACTORY_RESET:
-            ALINK_LOGD("Requests factory reset");
-            alink_factory_setting();
-            break;
+    case ALINK_EVENT_UPDATE_ROUTER:
+        ALINK_LOGD("Requests update router");
+        alink_update_router();
+        break;
 
-        case ALINK_EVENT_ACTIVATE_DEVICE:
-            ALINK_LOGD("Requests activate device");
-            alink_activate_device();
-            break;
+    case ALINK_EVENT_FACTORY_RESET:
+        ALINK_LOGD("Requests factory reset");
+        alink_factory_setting();
+        break;
 
-        default:
-            break;
+    case ALINK_EVENT_ACTIVATE_DEVICE:
+        ALINK_LOGD("Requests activate device");
+        alink_activate_device();
+        break;
+
+    default:
+        break;
     }
 
     return ALINK_OK;
@@ -265,7 +246,7 @@ static alink_err_t alink_event_handler(alink_event_t event)
 static void free_heap_task(void *arg)
 {
     for (;;) {
-        ALINK_LOGI("free heap size: %d, count: %d", esp_get_free_heap_size(), count);
+        ALINK_LOGI("free heap size: %d", esp_get_free_heap_size());
         vTaskDelay(5000 / portTICK_RATE_MS);
     }
 
@@ -280,18 +261,16 @@ static void free_heap_task(void *arg)
  */
 void reduce_serial_print()
 {
-    gpio_config_t io_conf;
-    //interrupt of rising edge
-    io_conf.intr_type = GPIO_INTR_ANYEDGE;
-    //bit mask of the pins, use GPIO4/5 here
-    io_conf.pin_bit_mask = 1 << 2;
-    //set as input mode
-    io_conf.mode = GPIO_MODE_INPUT;
-    //enable pull-up mode
-    io_conf.pull_up_en = 1;
-    gpio_config(&io_conf);
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_ANYEDGE,  // interrupt of rising edge
+        .pin_bit_mask = 1 << GPIO_NUM_2,  // bit mask of the pins, use GPIO2 here
+        .mode = GPIO_MODE_INPUT,  // set as input mode
+        .pull_up_en = GPIO_PULLUP_ENABLE,  // enable pull-up mode
+    };
 
-    if (gpio_get_level(2) == 1) {
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+    if (!gpio_get_level(GPIO_NUM_2)) {
         ALINK_LOGI("*********************************");
         ALINK_LOGI("*       SET LOGLEVEL INFO       *");
         ALINK_LOGI("*********************************");
@@ -322,8 +301,14 @@ void app_main()
                (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
                (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
     ALINK_LOGI("silicon revision : %d", chip_info.revision);
-    ALINK_LOGI("flash            : %dMB %s\n", spi_flash_get_chip_size() / (1024 * 1024),
+    ALINK_LOGI("flash            : %dMB %s", spi_flash_get_chip_size() / (1024 * 1024),
                (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+
+#ifdef CONFIG_ALINK_VERSION_SDS
+    ALINK_LOGI("alink version    : esp32-alink_sds\n");
+#else
+    ALINK_LOGI("alink version    : esp32-alink_embed\n");
+#endif
 
     ESP_ERROR_CHECK(nvs_flash_init());
     tcpip_adapter_init();
@@ -358,6 +343,7 @@ void app_main()
         .secret_device  = "puAxGjMbb4gd2beaapvMPZN4akedB3Xk",
 #endif
     };
+
 
     ESP_ERROR_CHECK(alink_init(&product_info, alink_event_handler));
     reduce_serial_print();
