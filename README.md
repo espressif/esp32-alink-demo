@@ -9,6 +9,10 @@
 3. alink embed：增加支持零配发现模式，默认配网激活模式，手机热点配网模式，但需要占更多的内存空间
 4. alink sds：APP和服务端允许客户定制化，但是需要收取服务收费
 
+> 注：
+1. 本工程目前支持的版本的 alink embed 和 alink sds，您可以通过 `make menuconfig` 进行版本切换
+2. alink embed 和 alink sds 的版本，目前不支持数据透传
+
 <img src="docs/readme_image/alink_description.png" width="700" />
 
 ### 1.2 为什么要使用 ALINK
@@ -71,7 +75,7 @@
     ├── main
     │   ├── alink_key_trigger.c                 // 按键触发函数
     │   ├── component.mk
-    │   └── sample_json.c                       // ALINK 非透传示例
+    │   └── app_main.c                          // ALINK 非透传示例
     ├── Makefile
     ├── README.md
     ├── sdkconfig                               // 保存配置选项
@@ -108,7 +112,7 @@ ESP32 ALINK 的默认配置已经存储在 sdkconfig， 如果你想要详细了
 
 ### 6.2 ALINK 配置
 使用 `make menuconfig->Component config->Enable alink EMBED function` 配置日志等级，数据传输模式、任务优先级等，推荐使用默认值。
-```
+```Makefile
 --- Enable alink_embed function
 <!-- alink 版本选择 -->
 Select the version of alink (esp32 alink sds)  --->
@@ -132,6 +136,7 @@ Configure the alink application layer's log (Info)  --->
 <!-- alink 官方日志等级配置 -->
 Configure the alink sdk's log (Debug)  --->
 ```
+
 ## 7 编译
 如果您是在 ubuntu x64bit 的平台下开发只需运行脚本 `gen_misc.sh` 即可完成编译及固件烧录，其他平台的参见：http://esp-idf.readthedocs.io/en/latest/get-started/index.html#setup-toolchain
 
@@ -165,7 +170,7 @@ Configure the alink sdk's log (Debug)  --->
     - 激活设备：单击 Boot 按键（<1s）
     - 重新配网：短按 Boot 按键（1~5s）
     - 出厂设置：长按 Boot 按键（>5s）
-    - 高频压测：GPIO5与3.3v短接重启
+    - 高频压测：GPIO2 与 3.3v 短接重启
 
 ## 10 开发流程
 ### 10.1 [签约入驻](https://open.aliplus.com/docs/open/open/enter/index.html)
@@ -192,7 +197,7 @@ Configure the alink sdk's log (Debug)  --->
         /*!< The Key-value pair used in the sandbox environment */
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-    
+
     #ifdef CONFIG_ALINK_VERSION_SDS
             /**
              * @brief As a unique identifier for the sds device
@@ -209,7 +214,7 @@ Configure the alink sdk's log (Debug)  --->
     - 激活设备：在配网过程中设备需求很服务发送激活指令（具体指令内容由实际产品决定）
     - 主动上报：当设备成功连接到阿里云服务器时需要主动上报设备的状态，以保证云端数据与设备端同步，否则将无法配网成功
     - 事件回调函数：设备配网过程中的所有动作，都会传入事件回调函数中，您可以根据实际需求事件回调函数相应的做相应处理，如在当设备进入配置配网模式灯慢闪，等待激活时灯快闪等
-        
+
         ```c
         typedef enum {
             ALINK_EVENT_CLOUD_CONNECTED = 0,/*!< ESP32 connected from alink cloude */
@@ -307,7 +312,6 @@ Configure the alink sdk's log (Debug)  --->
 - 模组不支持 5G 网络，请确认已关闭路由器 5G 网络功能
 - 测试热点配网时，请确认 4G 网络处于开启状态
 - ALINK 受网络环境影响极大，进行测试时，请保证网络环境良好，否则将无法通过高频压测和稳定性测试。
-- alink embed及sds版本，目前不支持数据透传
 
 ## 12 Related links
 * ESP32概览 : http://www.espressif.com/en/products/hardware/esp32/overview
