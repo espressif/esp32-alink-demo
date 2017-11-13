@@ -180,7 +180,7 @@ static alink_err_t event_handler(void *ctx, system_event_t *event)
         /*!< compatible with xiaomi company's R1C router */
         if (!g_timer) {
             g_timer = xTimerCreate("Timer", 4000 / portTICK_RATE_MS, false,
-                                 NULL, wifi_connect_timer_cb);
+                                   NULL, wifi_connect_timer_cb);
             xTimerStart(g_timer, 0);
         }
         break;
@@ -200,7 +200,7 @@ static alink_err_t event_handler(void *ctx, system_event_t *event)
 
     case SYSTEM_EVENT_STA_DISCONNECTED:
         ALINK_LOGI("SYSTEM_EVENT_STA_DISCONNECTED, free_heap: %d", esp_get_free_heap_size());
-        sys_net_is_ready = ALINK_FALSE;
+        sys_net_is_ready = false;
         alink_event_send(ALINK_EVENT_WIFI_DISCONNECTED);
         int ret = esp_wifi_connect();
 
@@ -232,10 +232,9 @@ int platform_awss_connect_ap(
     if (xSemConnet == NULL) {
         xSemConnet = xSemaphoreCreateBinary();
         esp_event_loop_set_cb(event_handler, NULL);
-    } else {
-        ESP_ERROR_CHECK(esp_wifi_stop());
     }
 
+    ESP_ERROR_CHECK(esp_wifi_stop());
     ESP_ERROR_CHECK(esp_wifi_get_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 
@@ -287,27 +286,6 @@ int platform_wifi_send_80211_raw_frame(_IN_ enum platform_awss_frame_type type,
     return ALINK_OK;
 }
 
-
-platform_wifi_mgnt_frame_cb_t g_callback = NULL;
-static uint8_t g_vendor_oui[3];
-static void ssc_vnd_filter_cb(void *ctx, wifi_vendor_ie_type_t type,
-                              const uint8_t sa[6], const vendor_ie_data_t *vnd_ie, int rssi)
-{
-    if (type != WIFI_VND_IE_TYPE_BEACON && type != WIFI_VND_IE_TYPE_PROBE_REQ) {
-        ALINK_LOGV("not support type: %d", type);
-        return;
-    }
-
-    if (vnd_ie->vendor_oui_type == 171) {
-        ALINK_LOGV("frame is no support, vnd_ie->type: %d", vnd_ie->vendor_oui_type);
-        return;
-    }
-
-    if (!memcmp(vnd_ie->vendor_oui, g_vendor_oui, sizeof(g_vendor_oui))) {
-        g_callback((uint8_t *)(vnd_ie), vnd_ie->length + 2, rssi, 1);
-    }
-}
-
 /**
  * @brief enable/disable filter specific management frame in wifi station mode
  *
@@ -326,6 +304,39 @@ static void ssc_vnd_filter_cb(void *ctx, wifi_vendor_ie_type_t type,
  * @see None.
  * @note awss use this API to filter specific mgnt frame in wifi station mode
  */
+typedef void (*wifi_sta_rx_probe_req_t)(const uint8_t *frame, int len, int rssi);
+
+/**
+ * @brief Vendor Information Element header
+ *
+ * The first bytes of the Information Element will match this header. Payload follows.
+ */
+typedef struct {
+    uint8_t element_id;      /**< Should be set to WIFI_VENDOR_IE_ELEMENT_ID (0xDD) */
+    uint8_t length;          /**< Length of all bytes in the element data following this field. Minimum 4. */
+    uint8_t vendor_oui[3];   /**< Vendor identifier (OUI). */
+    uint8_t vendor_oui_type; /**< Vendor-specific OUI type. */
+    uint8_t payload[0];      /**< Payload. Length is equal to value in 'length' field, minus 4. */
+} vendor_ie_data_t;
+
+static platform_wifi_mgnt_frame_cb_t g_callback = NULL;
+static uint8_t g_vendor_oui[3];
+
+static void wifi_sta_rx_probe_req(const uint8_t *frame, int len, int rssi)
+{
+    vendor_ie_data_t *alink_ie_info = (vendor_ie_data_t *)(frame + 60);
+    if (alink_ie_info->element_id == 221 && alink_ie_info->length != 67
+            && !memcmp(alink_ie_info->vendor_oui, g_vendor_oui, 3)) {
+
+        if (alink_ie_info->vendor_oui_type == 171) {
+            ALINK_LOGV("frame is no support, alink_ie_info->type: %d", alink_ie_info->vendor_oui_type);
+            return;
+        }
+
+        g_callback((uint8_t *)alink_ie_info, alink_ie_info->length + 2, rssi, 1);
+    }
+}
+
 int platform_wifi_enable_mgnt_frame_filter(_IN_ uint32_t filter_mask,
         _IN_OPT_ uint8_t vendor_oui[3], _IN_
         platform_wifi_mgnt_frame_cb_t callback)
@@ -339,8 +350,9 @@ int platform_wifi_enable_mgnt_frame_filter(_IN_ uint32_t filter_mask,
     g_callback = callback;
     memcpy(g_vendor_oui, vendor_oui, sizeof(g_vendor_oui));
 
-    ret = esp_wifi_set_vendor_ie_cb(ssc_vnd_filter_cb, NULL);
-    ALINK_ERROR_CHECK(ret != ALINK_OK, ALINK_ERR, "esp_wifi_set_vendor_ie_cb, ret: %d", ret);
+    extern esp_err_t esp_wifi_set_sta_rx_probe_req(wifi_sta_rx_probe_req_t cb);
+    ret = esp_wifi_set_sta_rx_probe_req(wifi_sta_rx_probe_req);
+    ALINK_ERROR_CHECK(ret != ALINK_OK, ALINK_ERR, "esp_wifi_set_sta_rx_probe_req, ret: %d", ret);
 
     return ALINK_OK;
 }

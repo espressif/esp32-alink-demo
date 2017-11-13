@@ -70,7 +70,7 @@ typedef int32_t alink_err_t;
 #endif
 
 #ifndef CONFIG_ALINK_DATA_LEN
-#define CONFIG_ALINK_DATA_LEN             1024
+#define CONFIG_ALINK_DATA_LEN             2048
 #endif
 
 #ifndef CONFIG_ALINK_TASK_PRIOTY

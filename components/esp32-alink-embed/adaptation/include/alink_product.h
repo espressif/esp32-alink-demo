@@ -39,6 +39,11 @@ extern "C" {
  *  @{
  */
 
+#ifndef CONFIG_DEVICE_ID_ADRR
+#define CONFIG_DEVICE_ID_ADRR   0x7000
+#endif
+#define DEVICE_ID_ADRR          CONFIG_DEVICE_ID_ADRR
+
 #define PRODUCT_SN_LEN          (64 + 1)
 #define PRODUCT_MODEL_LEN       (80 + 1)
 #define PRODUCT_KEY_LEN         (20 + 1)

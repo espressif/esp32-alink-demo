@@ -28,6 +28,7 @@
 
 #include "alink_product.h"
 #include "esp_alink_log.h"
+#include "esp_spi_flash.h"
 
 static const char *TAG = "alink_product";
 static alink_product_t g_device_info;
@@ -85,12 +86,32 @@ char *product_get_debug_secret(char secret_str[PRODUCT_SECRET_LEN])
 
 char *product_get_device_key(char key_str[PRODUCT_KEY_LEN])
 {
-    return strncpy(key_str, g_device_info.key_device, PRODUCT_KEY_LEN);
+    alink_err_t ret = ALINK_OK;
+
+    if (g_device_info.key_device && strlen(g_device_info.key_device) == PRODUCT_KEY_LEN - 1) {
+        return strncpy(key_str, g_device_info.key_device, PRODUCT_KEY_LEN);
+    }
+
+    ret = spi_flash_read(DEVICE_ID_ADRR, key_str, PRODUCT_KEY_LEN - 1);
+    ALINK_ERROR_CHECK(ret < 0, NULL, "spi_flash_read, key_str, ret: %d", ret);
+
+    ALINK_LOGD("device_key: %s", key_str);
+    return key_str;
 }
 
 char *product_get_device_secret(char secret_str[PRODUCT_SECRET_LEN])
 {
-    return strncpy(secret_str, g_device_info.secret_device, PRODUCT_SECRET_LEN);
+    alink_err_t ret = ALINK_OK;
+
+    if (g_device_info.secret_device && strlen(g_device_info.secret_device) == PRODUCT_SECRET_LEN - 1) {
+        return strncpy(secret_str, g_device_info.secret_device, PRODUCT_SECRET_LEN);
+    }
+
+    ret = spi_flash_read(DEVICE_ID_ADRR + PRODUCT_KEY_LEN, secret_str, PRODUCT_SECRET_LEN - 1);
+    ALINK_ERROR_CHECK(ret < 0, NULL, "spi_flash_read, secret_str, ret: %d", ret);
+
+    ALINK_LOGD("device_secret: %s", secret_str);
+    return secret_str;
 }
 
 char *product_get_sn(char sn_str[PRODUCT_SN_LEN])

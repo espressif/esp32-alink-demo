@@ -183,15 +183,6 @@ static alink_err_t alink_event_handler(alink_event_t event)
     case ALINK_EVENT_CLOUD_CONNECTED:
         ALINK_LOGD("Alink cloud connected!");
         proactive_report_data();
-
-        /*!< zero configuration configuration need to open the softap */
-        wifi_mode_t wifi_mode = 0;
-        ESP_ERROR_CHECK(esp_wifi_get_mode(&wifi_mode));
-
-        if (wifi_mode != WIFI_MODE_APSTA) {
-            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-        }
-
         break;
 
     case ALINK_EVENT_CLOUD_DISCONNECTED:
@@ -323,6 +314,20 @@ void app_main()
     extern void alink_key_trigger(void *arg);
     xTaskCreate(alink_key_trigger, "alink_key_trigger", 1024 * 2, NULL, 10, NULL);
 
+#ifdef CONFIG_ALINK_VERSION_SDS
+    const alink_product_t product_info = {
+        .name           = "alink_product",
+        /*!< Product version number, ota upgrade need to be modified */
+        .version        = "1.0.0",
+        .model          = "OPENALINK_LIVING_LIGHT_SDS_TEST",
+        /*!< The Key-value pair used in the product */
+        .key            = "1L6ueddLqnRORAQ2sGOL",
+        .secret         = "qfxCLoc1yXEk9aLdx5F74tl1pdxl0W0q7eYOvvuo",
+        /*!< The Key-value pair used in the sandbox environment */
+        .key_sandbox    = "",
+        .secret_sandbox = "",
+    };
+#else
     const alink_product_t product_info = {
         .name           = "alink_product",
         /*!< Product version number, ota upgrade need to be modified */
@@ -334,16 +339,8 @@ void app_main()
         /*!< The Key-value pair used in the sandbox environment */
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-
-#ifdef CONFIG_ALINK_VERSION_SDS
-        /**
-         * @brief As a unique identifier for the sds device
-         */
-        .key_device     = "vfyjJdC0O6b2P3UZXq4g",
-        .secret_device  = "puAxGjMbb4gd2beaapvMPZN4akedB3Xk",
-#endif
     };
-
+#endif
 
     ESP_ERROR_CHECK(alink_init(&product_info, alink_event_handler));
     reduce_serial_print();
