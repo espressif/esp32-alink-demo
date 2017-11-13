@@ -277,13 +277,7 @@ int platform_awss_connect_ap(
 int platform_wifi_send_80211_raw_frame(_IN_ enum platform_awss_frame_type type,
                                        _IN_ uint8_t *buffer, _IN_ int len)
 {
-    ALINK_PARAM_CHECK(buffer);
-
-    extern esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *buffer, int len);
-    int ret = esp_wifi_80211_tx(ESP_IF_WIFI_STA, buffer, len);
-    ALINK_ERROR_CHECK(ret != ALINK_OK, ALINK_ERR, "esp_wifi_80211_tx, ret: 0x%x", ret);
-
-    return ALINK_OK;
+    return -2;
 }
 
 /**
@@ -304,57 +298,11 @@ int platform_wifi_send_80211_raw_frame(_IN_ enum platform_awss_frame_type type,
  * @see None.
  * @note awss use this API to filter specific mgnt frame in wifi station mode
  */
-typedef void (*wifi_sta_rx_probe_req_t)(const uint8_t *frame, int len, int rssi);
-
-/**
- * @brief Vendor Information Element header
- *
- * The first bytes of the Information Element will match this header. Payload follows.
- */
-typedef struct {
-    uint8_t element_id;      /**< Should be set to WIFI_VENDOR_IE_ELEMENT_ID (0xDD) */
-    uint8_t length;          /**< Length of all bytes in the element data following this field. Minimum 4. */
-    uint8_t vendor_oui[3];   /**< Vendor identifier (OUI). */
-    uint8_t vendor_oui_type; /**< Vendor-specific OUI type. */
-    uint8_t payload[0];      /**< Payload. Length is equal to value in 'length' field, minus 4. */
-} vendor_ie_data_t;
-
-static platform_wifi_mgnt_frame_cb_t g_callback = NULL;
-static uint8_t g_vendor_oui[3];
-
-static void wifi_sta_rx_probe_req(const uint8_t *frame, int len, int rssi)
-{
-    vendor_ie_data_t *alink_ie_info = (vendor_ie_data_t *)(frame + 60);
-    if (alink_ie_info->element_id == 221 && alink_ie_info->length != 67
-            && !memcmp(alink_ie_info->vendor_oui, g_vendor_oui, 3)) {
-
-        if (alink_ie_info->vendor_oui_type == 171) {
-            ALINK_LOGV("frame is no support, alink_ie_info->type: %d", alink_ie_info->vendor_oui_type);
-            return;
-        }
-
-        g_callback((uint8_t *)alink_ie_info, alink_ie_info->length + 2, rssi, 1);
-    }
-}
-
 int platform_wifi_enable_mgnt_frame_filter(_IN_ uint32_t filter_mask,
         _IN_OPT_ uint8_t vendor_oui[3], _IN_
         platform_wifi_mgnt_frame_cb_t callback)
 {
-    ALINK_PARAM_CHECK(vendor_oui);
-    ALINK_PARAM_CHECK(callback);
-    ALINK_ERROR_CHECK(filter_mask != (FRAME_PROBE_REQ_MASK | FRAME_BEACON_MASK),
-                      -2, "frame is no support, frame: 0x%x", filter_mask);
-
-    alink_err_t ret = 0;
-    g_callback = callback;
-    memcpy(g_vendor_oui, vendor_oui, sizeof(g_vendor_oui));
-
-    extern esp_err_t esp_wifi_set_sta_rx_probe_req(wifi_sta_rx_probe_req_t cb);
-    ret = esp_wifi_set_sta_rx_probe_req(wifi_sta_rx_probe_req);
-    ALINK_ERROR_CHECK(ret != ALINK_OK, ALINK_ERR, "esp_wifi_set_sta_rx_probe_req, ret: %d", ret);
-
-    return ALINK_OK;
+    return -2;
 }
 
 /**
