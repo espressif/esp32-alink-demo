@@ -52,7 +52,7 @@
     ├── bin                                     // 存放生成的 bin 文件
     ├── build                                   // 存放所有编译生成的文件
     ├── components
-    │   └── esp32-alink_embed                   // ALINK EMBED 适配文件
+    │   └── esp32-alink_embed                   // ALINK 适配文件
     │       ├── adaptation                      // ALINK 的底层适配
     │       ├── application                     // ALINK 应用层API的封装
     │       │   ├── esp_alink_main.c            // 连接ap、恢复出厂设置、事件回调函数
@@ -70,6 +70,7 @@
     │       ├── Kconfig                         // make menuconfig 配置文件
     │       ├── lib                             // 库文件
     │       └── README.md
+    ├── device_id                               // 存放 ALINK SDS 的设备 ID
     ├── esp-idf                                 // ESP32 SDK
     ├── gen_misc.sh                             // 编译脚本
     ├── main
@@ -82,6 +83,7 @@
     └── setup_toolchain.sh                      // 编译环境的搭建脚本
 
 ## 5 编译环境的搭建
+
 如果您是在 ubuntu x64bit 的平台下开发只需运行脚本 `setup_toolchain.sh`，一键完成开发环境的搭建。若是其他平台请参见：http://esp-idf.readthedocs.io/en/latest/get-started/linux-setup.html
 
 ```bash
@@ -139,13 +141,22 @@ Configure the alink sdk's log (Debug)  --->
 
 ## 7 编译
 如果您是在 ubuntu x64bit 的平台下开发只需运行脚本 `gen_misc.sh` 即可完成编译及固件烧录，其他平台的参见：http://esp-idf.readthedocs.io/en/latest/get-started/index.html#setup-toolchain
+```bash
+./gen_misc.sh 0 "8Rd98k3Ht0bxblf3TSf9,NrazMjfM9ta87HzqHEHXAaVa0glLb1Ym"
+```
+>>注：第一个参数为串口号，第二个参数为设备ID，embed 版本无需输入设备ID
 
 ## 8 固件烧录（windows）
 1. 安装[串口驱动](http://www.silabs.com/products/mcu/Pages/USBtoUARTBridgeVCPDrivers.aspx)
 2. 安装[烧写工具](http://espressif.com/sites/default/files/tools/flash_download_tools_v3.4.8_0.zip)
 3. 烧录相关 bin 文件
-    - ESP32-DevKitC 支持自动下载，按照如下所示，配置串口号、串口波特率等，按 `START` 即可开始下载程序
+    - ESP32_Core_board_V2 支持自动下载，按照如下所示，配置串口号、串口波特率等，按 `START` 即可开始下载程序。如果您使用的是 ALINK SDS 版，需向阿里官方购买设备ID， ALINK SDS 的每一个设备都需要一个唯一的设备ID，并将您购买的设备 ID 导成 csv 的格式放入 device_id 文件夹中下载工具将自动device_id.bin，您也可以自行创建一个`device_id.bin`文件，如下格式填入设备ID即可:
 
+    ```
+    8Rd98k3Ht0bxblf3TSf9,NrazMjfM9ta87HzqHEHXAaVa0glLb1Ym
+    ```
+
+    <img src="docs/readme_image/device_id.png" width="400" />
     <img src="docs/readme_image/download.png" width="400" />
 
     ```
@@ -154,13 +165,18 @@ Configure the alink sdk's log (Debug)  --->
     blank.bin------------------>0x9000      // nvs flash 数据区
     blank.bin------------------>0xd000      // ota 升级数据
     alink.bin------------------>0x10000     // 主程序
+    device_id.bin-------------->0x310000    // alink embed 版本无需烧录设备ID
     ```
+
+
 4. 启动设备
     - 按下此轻触 EN 开关，系统复位，出现“ENTER SAMARTCONFIG MODE”信息，即表示 ALINK 程序正常运行，进入配网模式。
     <img src="docs/readme_image/running.png" width="400" />
 
 ## 9 运行与调试
-1. 下载阿里[智能厂测包](https://open.aliplus.com/download)
+1. 下载APP:
+    - ALINK EMBED: [接入阿里智能-厂测包](https://open.aliplus.com/download)
+    - ALINK SDS: [独立开发者-DemoAPP](https://open.aliplus.com/download)
 2. 登陆淘宝账号
 3. 开启配网模组测试列表：
     - 安卓：点击“环境切换”，勾选“开启配网模组测试列表”
@@ -170,7 +186,7 @@ Configure the alink sdk's log (Debug)  --->
     - 激活设备：单击 Boot 按键（<1s）
     - 重新配网：短按 Boot 按键（1~5s）
     - 出厂设置：长按 Boot 按键（>5s）
-    - 高频压测：GPIO2 与 3.3v 短接重启
+    - 高频压测：GPIO2 与 GND 短接重启
 
 ## 10 开发流程
 ### 10.1 [签约入驻](https://open.aliplus.com/docs/open/open/enter/index.html)
@@ -186,6 +202,20 @@ Configure the alink sdk's log (Debug)  --->
     阿里服务器后台导出设备 TRD 表格,调用`alink_init()`传入产品注册的信息，注册事件回调函数
 
     ```c
+#ifdef CONFIG_ALINK_VERSION_SDS
+    const alink_product_t product_info = {
+        .name           = "alink_product",
+        /*!< Product version number, ota upgrade need to be modified */
+        .version        = "1.0.0",
+        .model          = "OPENALINK_LIVING_LIGHT_SDS_TEST",
+        /*!< The Key-value pair used in the product */
+        .key            = "1L6ueddLqnRORAQ2sGOL",
+        .secret         = "qfxCLoc1yXEk9aLdx5F74tl1pdxl0W0q7eYOvvuo",
+        /*!< The Key-value pair used in the sandbox environment */
+        .key_sandbox    = "",
+        .secret_sandbox = "",
+    };
+#else
     const alink_product_t product_info = {
         .name           = "alink_product",
         /*!< Product version number, ota upgrade need to be modified */
@@ -197,15 +227,8 @@ Configure the alink sdk's log (Debug)  --->
         /*!< The Key-value pair used in the sandbox environment */
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-
-    #ifdef CONFIG_ALINK_VERSION_SDS
-            /**
-             * @brief As a unique identifier for the sds device
-             */
-            .key_device     = "vfyjJdC0O6b2P3UZXq4g",
-            .secret_device  = "puAxGjMbb4gd2beaapvMPZN4akedB3Xk",
-    #endif
     };
+#endif
 
     ESP_ERROR_CHECK(alink_init(&product_info, alink_event_handler));
     ```
