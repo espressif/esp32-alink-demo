@@ -183,15 +183,6 @@ static alink_err_t alink_event_handler(alink_event_t event)
     case ALINK_EVENT_CLOUD_CONNECTED:
         ALINK_LOGD("Alink cloud connected!");
         proactive_report_data();
-
-        /*!< zero configuration configuration need to open the softap */
-        wifi_mode_t wifi_mode = 0;
-        ESP_ERROR_CHECK(esp_wifi_get_mode(&wifi_mode));
-
-        if (wifi_mode != WIFI_MODE_APSTA) {
-            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-        }
-
         break;
 
     case ALINK_EVENT_CLOUD_DISCONNECTED:
@@ -323,6 +314,30 @@ void app_main()
     extern void alink_key_trigger(void *arg);
     xTaskCreate(alink_key_trigger, "alink_key_trigger", 1024 * 2, NULL, 10, NULL);
 
+#ifdef CONFIG_ALINK_VERSION_SDS
+    alink_product_t product_info = {
+        .name           = "alink_product",
+        /*!< Product version number, ota upgrade need to be modified */
+        .version        = "1.0.0",
+        .model          = "OPENALINK_LIVING_LIGHT_SDS_TEST",
+        /*!< The Key-value pair used in the product */
+        .key            = "1L6ueddLqnRORAQ2sGOL",
+        .secret         = "qfxCLoc1yXEk9aLdx5F74tl1pdxl0W0q7eYOvvuo",
+    };
+
+// #define CONFIG_USE_TEST_DEVICE_ID
+
+#ifdef CONFIG_USE_TEST_DEVICE_ID
+    uint8_t test_device_mac[] = {0x24, 0x0a, 0xc4, 0x11, 0x45, 0xfc};
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_mac(ESP_IF_WIFI_STA, test_device_mac));
+
+    product_info.key_device    = "8Rd98k3Ht0bxblf3TSf9";
+    product_info.secret_device = "NrazMjfM9ta87HzqHEHXAaVa0glLb1Ym";
+#endif
+
+#else
     const alink_product_t product_info = {
         .name           = "alink_product",
         /*!< Product version number, ota upgrade need to be modified */
@@ -334,16 +349,8 @@ void app_main()
         /*!< The Key-value pair used in the sandbox environment */
         .key_sandbox    = "dpZZEpm9eBfqzK7yVeLq",
         .secret_sandbox = "THnfRRsU5vu6g6m9X6uFyAjUWflgZ0iyGjdEneKm",
-
-#ifdef CONFIG_ALINK_VERSION_SDS
-        /**
-         * @brief As a unique identifier for the sds device
-         */
-        .key_device     = "vfyjJdC0O6b2P3UZXq4g",
-        .secret_device  = "puAxGjMbb4gd2beaapvMPZN4akedB3Xk",
-#endif
     };
-
+#endif
 
     ESP_ERROR_CHECK(alink_init(&product_info, alink_event_handler));
     reduce_serial_print();
